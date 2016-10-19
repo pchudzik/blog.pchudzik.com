@@ -1,6 +1,6 @@
 # ( cd themes && git clone git@github.com:pdevty/material-design.git )
 theme = "material-design"
-baseurl = "blog.pchudzik.com"
+baseurl = "//blog.pchudzik.com"
 languageCode = "en-us"
 title = "tech gibberish"
 MetaDataFormat = "toml"

@@ -53,5 +53,5 @@ footer.page-footer {
 }
 
 .teal-text.text-lighten-2 a {
-  color: white;
+  color: white !important;
 }
