@@ -13,7 +13,7 @@ copyright = "© 2015 Copyright Paweł Chudzik"
   github = "pchudzik"
   headerCover = "images/header.jpeg"
   footerCover = "images/footer.jpeg"
-  #linkedin = "Your LinkedIn Name"
+  linkedin = "paweł-chudzik-752483130"
   googleAnalyticsUserID = "UA-85832534-1"
 
 [permalinks]
