@@ -55,3 +55,16 @@ footer.page-footer {
 .teal-text.text-lighten-2 a {
   color: white !important;
 }
+
+.summary-meta div {
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.summary-meta .date {
+  width:40%;
+  text-align: right;
+}
+.more-link {
+  width: 50%;
+}
