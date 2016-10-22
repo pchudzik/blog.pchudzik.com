@@ -1,0 +1,33 @@
+box: debian
+
+build:
+  steps:
+    - script:
+        name: install git
+        code: apt-get update && apt-get install git -y
+
+    - script:
+        name: download theme
+        code: |
+            git clone https://github.com/pdevty/material-design.git themes/material-design
+            (cd themes/material-design && git checkout 587b3af7db83f4677dfd905520ba968ada3686f7)
+
+    - script:
+        nme: save deploy date
+        code: date > static/deploy.txt
+
+    - arjen/hugo-build:
+        version: "0.17"
+        theme: "material-design"
+
+deploy:
+  steps:
+    - script:
+        name: install curl
+        code: apt-get update && apt-get install curl -y
+
+    - duleorlovic/ftp-deploy:
+        cwd: public/
+        destination: $DEPLOY_DESTINATION
+        username: $USER
+        password: $PASSWORD
