@@ -5,7 +5,11 @@ nav .brand-logo {
   color: #444;
 }
 p {
-  line-height: 2rem;
+  line-height: 1.5rem;
+}
+
+p small {
+  line-height: 1rem;
 }
 
 .button-collapse {
@@ -65,6 +69,13 @@ footer.page-footer {
   width:40%;
   text-align: right;
 }
+
 .more-link {
   width: 50%;
 }
+
+.card-panel li {
+  list-style: disc;
+  margin-left: 20px;
+}
+
