@@ -4,7 +4,7 @@ baseurl = "//blog.pchudzik.com"
 languageCode = "en-us"
 title = "tech gibberish"
 MetaDataFormat = "toml"
-paginate = 9 # To specify a multiple of 3
+paginate = 3 # To specify a multiple of 3
 disqusShortname = "blog-pchudzik-com"
 copyright = "© 2015 Copyright Paweł Chudzik"
 
