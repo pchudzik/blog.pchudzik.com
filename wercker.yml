@@ -24,10 +24,9 @@ deploy:
   steps:
     - script:
         name: install curl
-        code: apt-get update && apt-get install curl php5 php5-cli -y
+        code: apt-get update && apt-get install curl -y
 
-    - bugscal/new-ftp-deploy:
-        cwd: public/
-        destination: $DEPLOY_DESTINATION
+    - wercker-labs/azure-ftp-deploy:
+        publish-url: $DEPLOY_DESTINATION
         username: $USER
         password: $PASSWORD
