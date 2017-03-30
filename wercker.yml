@@ -24,7 +24,7 @@ deploy:
   steps:
     - script:
         name: install curl
-        code: apt-get update && apt-get install curl php -y
+        code: apt-get update && apt-get install curl php5 php5-cli -y
 
     - bugscal/new-ftp-deploy:
         cwd: public/
