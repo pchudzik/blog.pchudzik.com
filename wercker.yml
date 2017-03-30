@@ -26,7 +26,7 @@ deploy:
         name: install curl
         code: apt-get update && apt-get install curl -y
 
-    - duleorlovic/ftp-deploy:
+    - bugscal/new-ftp-deploy:
         cwd: public/
         destination: $DEPLOY_DESTINATION
         username: $USER
