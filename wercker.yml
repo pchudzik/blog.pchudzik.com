@@ -25,10 +25,6 @@ deploy:
     - script:
         name: install curl
         code: apt-get update && apt-get install curl php5 php5-cli -y
-        
-    - script:
-        name: print env
-        code: echo "deploying to $DEPLOY_DESTINATION using $USER"
 
     - bugscal/new-ftp-deploy:
         cwd: public/
