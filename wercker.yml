@@ -26,7 +26,8 @@ deploy:
         name: install curl
         code: apt-get update && apt-get install curl -y
 
-    - wercker-labs/azure-ftp-deploy:
-        publish-url: $DEPLOY_DESTINATION
+    - duleorlovic/ftp-deploy:
+        cwd: public/
+        destination: $DEPLOY_DESTINATION
         username: $USER
         password: $PASSWORD
