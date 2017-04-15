@@ -77,4 +77,4 @@ When I first saw when immutable entity with @RequiredArgsConstructor is properly
 json I was really surprised and had one of those wtf moments "how it's working? how is it working?"
 Then I setup few brakpoints and finally figured out what's going on and how it's working :)
 
-[source code](TODO)
+[source code](https://github.com/pchudzik/blog-example-immutable-dto)
