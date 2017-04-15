@@ -6,7 +6,7 @@ title = "tech gibberish"
 MetaDataFormat = "toml"
 paginate = 6 # To specify a multiple of 3
 disqusShortname = "blog-pchudzik-com"
-copyright = "© 2015 Copyright Paweł Chudzik"
+copyright = "© 2017 Copyright Paweł Chudzik"
 
 [params]
   description = "by Paweł Chudzik"
