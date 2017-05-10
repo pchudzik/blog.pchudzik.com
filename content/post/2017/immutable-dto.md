@@ -17,6 +17,7 @@ constructor based object creation and uses
 <!--more-->
 
 With this approach you can easily deserialize immutable objects from json.
+
 ```java
 import java.beans.ConstructorProperties;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;

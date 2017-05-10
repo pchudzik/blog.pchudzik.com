@@ -8,9 +8,8 @@ First post. It must be Hello world.
 
 I'm going to try and start posting something regularly.
 
-I'm Java and javascript so it's probably will be the main topic of this 
-blog. Sometimes I will try to write something more generic and not language 
-specific.
+I'm Java and javascript so it's probably will be the main topic of this blog. Sometimes I will try
+to write something more generic and not language specific.
 
 <!--more-->
 

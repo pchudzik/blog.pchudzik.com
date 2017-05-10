@@ -79,3 +79,49 @@ footer.page-footer {
   margin-left: 20px;
 }
 
+h1.header {
+  font-size: 4.8rem;
+}
+
+.post-content h1.post-title {
+  font-size: 2.7rem;
+}
+
+.post-content h1 {
+  font-size: 2rem;
+  line-height: 110%;
+  margin: 1.14rem 0 0.912rem 0;
+  font-weight: 400;
+}
+
+.post-content h2 {
+  font-size: 1.5rem;
+  line-height: 110%;
+  margin: 1.14rem 0 0.912rem 0;
+  font-weight: 400;
+}
+
+.post-content h3 {
+  font-size: 1.3rem;
+  line-height: 110%;
+  margin: 1.14rem 0 0.912rem 0;
+  font-weight: 400;
+}
+
+.post-content h4 {
+  font-size: 1.1rem;
+  line-height: 110%;
+  margin: 1.14rem 0 0.912rem 0;
+  font-weight: 400;
+}
+
+.post-content h5 {
+  font-size: 1rem;
+  line-height: 110%;
+  margin: 1.14rem 0 0.912rem 0;
+  font-weight: 600;
+}
+
+.post-content small {
+  font-size: 0.8rem;
+}

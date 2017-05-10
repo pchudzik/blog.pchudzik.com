@@ -13,7 +13,7 @@ dependencies in maven, gradle and npm.
 
 <!--more-->
 
-##### CI 
+# CI 
 
 The first thing which in my opinion is crucial to stay up to date is to create automated checker.
 The best place for this will be your CI tool. Create jenkins plan (or whatever CI tool project)
@@ -33,7 +33,7 @@ it is scheduled and it fails in the middle of the night then every developer wil
 the build fails after your commit then you feel responsible for it and try to fix it to keep board
 green ([broken windows theory](https://en.wikipedia.org/wiki/Broken_windows_theory)).
 
-##### npm
+# npm
 
 When using npm as dependencies manager it is very simple to find out outdated packages - just run
 ```npm outadted``` ([docs](https://docs.npmjs.com/cli/outdated)) and you are good to go. Sample
@@ -59,9 +59,9 @@ OUTDATED_PACKAGES=`npm -s outdated | grep -v beta | grep -v rc`
 OUTDATED_PACKAGES_COUNT=`echo "$OUTDATED_PACKAGES" | tail -n +2 | wc -l`
 
 if [ $OUTDATED_PACKAGES_COUNT -ge $MAX_OUTDATED_PACKAGES ]; then
-    echo "There is $OUTDATED_PACKAGES_COUNT outdated dependencies!"
-    printf '%b\n\n' "$OUTDATED_PACKAGES"
-    exit $OUTDATED_PACKAGES_COUNT
+  echo "There is $OUTDATED_PACKAGES_COUNT outdated dependencies!"
+  printf '%b\n\n' "$OUTDATED_PACKAGES"
+  exit $OUTDATED_PACKAGES_COUNT
 fi
 
 ```
@@ -71,7 +71,7 @@ dependencies. Script is very simple and will exclude most of beta and release ca
 
 [source](https://github.com/pchudzik/blog-example-dependencies/blob/master/npm/find-outdated-dependencies)
 
-##### Gradle
+# Gradle
 
 To find outdated dependencies in gradle you can use [gradle versions
 plugin](https://github.com/ben-manes/gradle-versions-plugin). Sample output from versions plugin:
@@ -108,9 +108,9 @@ REPORT="build/dependencyUpdates/report.txt"
 OUDATED_DEPENDENCIES_COUNT=`sed -n -e '/The following dependencies have later/,$p' $REPORT | tail -n +2 | wc -l`
 
 if [ $OUDATED_DEPENDENCIES_COUNT -ge $MAX_OUTDATED_DEPENDENCIES ]; then
-    echo "There is $OUDATED_DEPENDENCIES_COUNT outdated dependencies!"
-    printf '%b\n\n' "$(cat $REPORT)"
-    exit $OUDATED_DEPENDENCIES_COUNT
+  echo "There is $OUDATED_DEPENDENCIES_COUNT outdated dependencies!"
+  printf '%b\n\n' "$(cat $REPORT)"
+  exit $OUDATED_DEPENDENCIES_COUNT
 fi
 
 ```
@@ -120,15 +120,15 @@ of acceptable outdated libraries.
 
 [source](https://github.com/pchudzik/blog-example-dependencies/blob/master/gradle/find-oudated-dependencies)
 
-##### mvn
+# mvn
 
 To find outdated libraries using maven you can use [versions-maven-plugin](http://www.mojohaus.org/versions-maven-plugin).
 Add versions plugin to your plugins section:
 ```xml
 <plugin>
-    <groupId>org.codehaus.mojo</groupId>
-    <artifactId>versions-maven-plugin</artifactId>
-    <version>2.3</version>
+  <groupId>org.codehaus.mojo</groupId>
+  <artifactId>versions-maven-plugin</artifactId>
+  <version>2.3</version>
 </plugin>
 ```
 
@@ -165,9 +165,9 @@ mkdir -p target
 OUTDATED_LIBRARIES=`grep . "$OUTPUT" | tail -n +2 | wc -l`
 
 if [ $OUTDATED_LIBRARIES -ge $MAX_OUTDATED_LIBRARIES ]; then
-	echo "There is $OUTDATED_LIBRARIES outdated libraries!\n"
-	printf '%b\n\n' "$(cat target/outdated.txt)"
-	exit $OUTDATED_LIBRARIES
+  echo "There is $OUTDATED_LIBRARIES outdated libraries!\n"
+  printf '%b\n\n' "$(cat target/outdated.txt)"
+  exit $OUTDATED_LIBRARIES
 fi
 ```
 

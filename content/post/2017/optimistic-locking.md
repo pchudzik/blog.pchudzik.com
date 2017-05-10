@@ -18,13 +18,13 @@ or timestamp field and you are good to go. Right?
 
 <!--more-->
 
-##### tl;dr
+# tl;dr
 
 When you care about data consistency and user experience you should take advantage of
 optimistic locking feature built in JPA and in order to do so sometimes you have to write some
 additional code.
 
-##### Intro
+# Intro
 
 We will do classic [Alice and Bob](https://en.wikipedia.org/wiki/Alice_and_Bob) example:
 
@@ -35,7 +35,7 @@ post and decides to fix paragraphs order. In the meantime Bob is still working o
 fixing typos etc. What will happen when Bob decides to save his post version is not really
 important. Important is that it should not be accidental behavior but deliberate action.
 
-##### Plain SQL
+# Plain SQL
 
 Let's start with plain SQL example of optimistic locking. Optimistic locking is very useful in
 update queries:
@@ -70,7 +70,7 @@ where
 Now when Bob saves his post version after lunch nothing is changed because Alice updated post in the
 meantime and Bob's query will not match any records.
 
-##### JPA
+# JPA
 
 We rarely rely on plain SQL when writing java applications. Approach we often use in applications is
 to add number or timestamp field annotated with @Version and leave rest of the work to the JPA
@@ -95,25 +95,25 @@ expected. First take a look at the model:
 @Getter
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class Post {
-	@Id
-	@GeneratedValue
-	private Long id;
+  @Id
+  @GeneratedValue
+  private Long id;
 
-	@Version
-	private Long version;
+  @Version
+  private Long version;
 
-	private String title;
-	private String content;
+  private String title;
+  private String content;
 
-	public Post(String title, String content) {
-		this.title = title;
-		this.content = content;
-	}
+  public Post(String title, String content) {
+    this.title = title;
+    this.content = content;
+  }
 
-	public void update(String newTitle, String newContent) {
-		this.title = newTitle;
-		this.content = newContent;
-	}
+  public void update(String newTitle, String newContent) {
+    this.title = newTitle;
+    this.content = newContent;
+  }
 }
 ```
 
@@ -171,47 +171,47 @@ And simple test proving the point:
 
 ```java
 def "optimistic locking failure without sending version to the client"() {
-    given: "Bob saves first post version"
-    final postId = transactionTemplate.execute({ status ->
-      entityManager.merge(new Post("post", "content"))
-    }).id
+  given: "Bob saves first post version"
+  final postId = transactionTemplate.execute({ status ->
+    entityManager.merge(new Post("post", "content"))
+  }).id
 
-    when: "Alice changes paragraphs order while Bob is fixing typos"
-    final alicePostDto = transactionTemplate.execute({ status -> 
-      new PostDtoWithoutVersion(entityManager.find(Post.class, postId)) 
-    })
-    alicePostDto.title = "Alice's title"
-    alicePostDto.content = "Alice's content"
+  when: "Alice changes paragraphs order while Bob is fixing typos"
+  final alicePostDto = transactionTemplate.execute({ status -> 
+    new PostDtoWithoutVersion(entityManager.find(Post.class, postId)) 
+  })
+  alicePostDto.title = "Alice's title"
+  alicePostDto.content = "Alice's content"
 
 
-    and: "Bob is fixing typos in first version"
-    final bobPostDto = transactionTemplate.execute({ status -> 
-      new PostDtoWithoutVersion(entityManager.find(Post.class, postId)) 
-    })
-    bobPostDto.title = "Bob's title"
-    bobPostDto.content = "Bob's content"
+  and: "Bob is fixing typos in first version"
+  final bobPostDto = transactionTemplate.execute({ status -> 
+    new PostDtoWithoutVersion(entityManager.find(Post.class, postId)) 
+  })
+  bobPostDto.title = "Bob's title"
+  bobPostDto.content = "Bob's content"
 
-    and: "Alice clicks save"
-    transactionTemplate.execute({ status ->
-      entityManager
-          .find(Post.class, alicePostDto.id)
-          .update(alicePostDto.title, alicePostDto.content)
-    })
+  and: "Alice clicks save"
+  transactionTemplate.execute({ status ->
+    entityManager
+      .find(Post.class, alicePostDto.id)
+      .update(alicePostDto.title, alicePostDto.content)
+  })
 
-    and: "Bob clicks save"
-    transactionTemplate.execute({ status ->
-      entityManager
-          .find(Post.class, bobPostDto.id)
-          .update(bobPostDto.title, bobPostDto.content)
-    })
+  and: "Bob clicks save"
+  transactionTemplate.execute({ status ->
+    entityManager
+      .find(Post.class, bobPostDto.id)
+      .update(bobPostDto.title, bobPostDto.content)
+  })
 
-    then: "database state when Alice and Bob are finished with post edition"
-    final postInDb = transactionTemplate.execute({ status -> 
-      entityManager.find(Post.class, postId) 
-    })
-    postInDb.title == "Bob's title"
-    postInDb.content == "Bob's content"
-  }
+  then: "database state when Alice and Bob are finished with post edition"
+  final postInDb = transactionTemplate.execute({ status -> 
+    entityManager.find(Post.class, postId) 
+  })
+  postInDb.title == "Bob's title"
+  postInDb.content == "Bob's content"
+}
 ```
 
 In the above example hibernate has no idea what is going on and it can not help you with optimistic
@@ -219,6 +219,7 @@ locking. We just tell it to load latest version from DB apply changes on it and 
 proper version control Bob will overwrite all changes made by Alice.
 
 To avoid this issue we can simply send version to the client:
+
 ```java
 @Data
 public class PostDto {
@@ -232,41 +233,41 @@ public class PostDto {
 And everything will work like in the first test case:
 ```java
 def "working optimistic locking when sending version to the client"() {
-    given: "Bob saves first post version"
-    final Post firstPostVersion = transactionTemplate.execute({ status ->
-      entityManager.merge(new Post("post", "content"))
-    })
+  given: "Bob saves first post version"
+  final Post firstPostVersion = transactionTemplate.execute({ status ->
+    entityManager.merge(new Post("post", "content"))
+  })
 
-    when: "Alice changes paragraphs order while Bob is fixing typos"
-    final PostDto alicePostDto = transactionTemplate.execute({ status -> 
-      new PostDto(entityManager.find(Post.class, firstPostVersion.getId())) 
-    })
-    alicePostDto.title = "Alice's title"
-    alicePostDto.content = "Alice's content"
+  when: "Alice changes paragraphs order while Bob is fixing typos"
+  final PostDto alicePostDto = transactionTemplate.execute({ status -> 
+    new PostDto(entityManager.find(Post.class, firstPostVersion.getId())) 
+  })
+  alicePostDto.title = "Alice's title"
+  alicePostDto.content = "Alice's content"
 
 
-    and: "Bob is fixing typos in first version"
-    final PostDto bobPost = transactionTemplate.execute({ status -> 
-      new PostDto(entityManager.find(Post.class, firstPostVersion.getId())) 
-    })
-    bobPost.title = "Bob's title"
-    bobPost.content = "Bob's content"
+  and: "Bob is fixing typos in first version"
+  final PostDto bobPost = transactionTemplate.execute({ status -> 
+    new PostDto(entityManager.find(Post.class, firstPostVersion.getId())) 
+  })
+  bobPost.title = "Bob's title"
+  bobPost.content = "Bob's content"
 
-    and: "Alice clicks save"
-    transactionTemplate.execute({ status ->
-      findPost(alicePostDto.id, alicePostDto.version)
-        .update(alicePostDto.title, alicePostDto.content)
-    })
+  and: "Alice clicks save"
+  transactionTemplate.execute({ status ->
+    findPost(alicePostDto.id, alicePostDto.version)
+      .update(alicePostDto.title, alicePostDto.content)
+  })
 
-    and: "Bob clicks save"
-    transactionTemplate.execute({ status ->
-      findPost(bobPost.id, bobPost.version)
-        .update(bobPost.title, bobPost.content)
-    })
+  and: "Bob clicks save"
+  transactionTemplate.execute({ status ->
+    findPost(bobPost.id, bobPost.version)
+      .update(bobPost.title, bobPost.content)
+  })
 
-    then:
-    thrown OptimisticLockException
-  }
+  then:
+  thrown OptimisticLockException
+}
 
 ```
 
@@ -287,7 +288,7 @@ example. In real world DB should do version checking for you (from Post where id
 :version) and it will be your job to handle situation when nothing is found.
 
 
-##### Summary
+# Summary
 
 Optimistic locking will not be magically handled by hibernate if it doesn't know what's going on.
 When it is required it is important to make sure that everything works as we want it to work and not
@@ -295,4 +296,4 @@ by accident. Tracking versions is not always necessary (for example when you hav
 but it is important to find out places where multiple users can work with the same object and make
 sure application is handling conflicts properly.
 
-[source code](https://github.com/pchudzik/blog-example-jpa-versioning)
+<small>[source code](https://github.com/pchudzik/blog-example-jpa-versioning)</small>
