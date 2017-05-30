@@ -1,6 +1,6 @@
 ---
 title: "Page object pattern for javascript components testing"
-Tags: ["testing", "tdd", "basics", "javascript", "angular"]
+Tags: ["testing", "tdd", "basics", "angular", "howto"]
 Categories: ["javascript"]
 description: "Using page object patter for angulars directives and react components"
 date: "2017-02-23"

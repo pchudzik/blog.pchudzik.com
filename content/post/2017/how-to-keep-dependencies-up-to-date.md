@@ -1,7 +1,7 @@
 ---
 title: "Keep your stuff up to date"
-Tags: ["javascript", "java", "mvn", "gradle"]
-Categories: ["best practices"]
+Tags: ["mvn", "gradle", "npm"]
+Categories: ["best practices", "java", "javascript"]
 description: "How to keep external dependencies up to date"
 date: "2017-03-30"
 ---

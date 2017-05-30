@@ -1,7 +1,7 @@
 ---
 title: "Java repositories testing"
-Tags: ["java", "tdd", "spring-boot", "hibernate", "flyway"]
-Categories: ["Java"]
+Tags: ["tdd", "spring", "hibernate", "flyway"]
+Categories: ["java"]
 description: "Sample on how to configure DB for tests"
 date: "2016-11-06"
 ---

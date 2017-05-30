@@ -1,6 +1,6 @@
 ---
 title: "Consistent return of hashCode in java"
-Tags: ["java", "hashCode", "equals", "basics"]
+Tags: ["basics"]
 Categories: ["Java"]
 description: "Hash code and equals and why you should avoid overwrite of it"
 date: "2016-10-19"

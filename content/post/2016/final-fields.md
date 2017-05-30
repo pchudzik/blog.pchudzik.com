@@ -1,7 +1,7 @@
 ---
 title: "Final fields"
-Tags: ["java", "jvm", "basics"]
-Categories: ["Java"]
+Tags: ["jvm", "basics"]
+Categories: ["java"]
 description: "What's up with final fields"
 date: "2016-12-03"
 ---

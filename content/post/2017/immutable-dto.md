@@ -1,6 +1,6 @@
 ---
 title: "Immutable dto in jackson"
-Tags: ["java", "interesting"]
+Tags: ["interesting"]
 Categories: ["java"]
 description: "How to create immutable dtos and deserialize them with jackson"
 date: "2017-04-15"

@@ -1,7 +1,7 @@
 ---
 title: "Test methods coupling"
-Tags: ["java", "tdd", "basics"]
-Categories: ["Java"]
+Tags: ["tdd", "basics"]
+Categories: ["java"]
 description: "Why test methods coupling is an anti pattern"
 date: "2016-10-29"
 ---

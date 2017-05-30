@@ -1,6 +1,6 @@
 ---
 title: "Poor man's batch processing in JPA"
-Tags: ["java", "hibernate"]
+Tags: ["spring", "hibernate"]
 Categories: ["java"]
 description: "Batch processing using jpa"
 date: "2017-05-16"

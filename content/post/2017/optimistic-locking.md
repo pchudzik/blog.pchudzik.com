@@ -1,6 +1,6 @@
 ---
 title: "Optimistic locking pitfalls"
-Tags: ["java", "basics", "hibernate"]
+Tags: ["basics", "hibernate"]
 Categories: ["java"]
 description: "Optimistic locking pitfalls"
 date: "2017-04-27"

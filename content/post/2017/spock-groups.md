@@ -1,7 +1,7 @@
 ---
 title: "Spock tests grouping using @Category from junit"
 Tags: ["groovy", "spock", "tdd"]
-Categories: ["Groovy"]
+Categories: ["groovy"]
 description: "Example on how to configure test groups using junit @Category annotation"
 date: "2017-01-14"
 ---
