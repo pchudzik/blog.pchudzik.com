@@ -257,7 +257,7 @@ handy when all you need to do is read data.
 When it comes to hibernate there are a lot configuration switches which will allow you to [control
 things](https://docs.jboss.org/hibernate/orm/5.2/userguide/html_single/Hibernate_User_Guide.html#batch).
 
-## spring-data
+## Spring-data
 
 Spring data supports java8 streams so there is not much to there. Just create repository and make
 sure you'll return stream of entities:
@@ -270,8 +270,24 @@ interface SpringDataStream extends Repository<Product, Long> {
 
 ```
 
+One thing worth mentioning is that once you are done with the stream it should be closed (you can
+close it manually in the final block, or wrap it in the try with the resource block).
+
 From all of the above spring data saves us a lot of writing and testing, but sometimes it is good to
 know what's going on under the hood.
+
+## Cache invalidation after data fetch
+ 
+After loading data into hibernate's session cache it is important to invalidate it so used memory
+can be released. How to perform cache clean depends on the use case. When working with iterators you
+have more control and can free some memory once you are done with the particular part of the task.
+For example you can call em.clear() every 100 processed records or something like that, just
+remember that it might be tricky to keep iterator implementation independent from the processing
+logic. If processing logic starts to leak into iterator implementation or other way around you can
+fallback to Page or Slice (classes from the spring-data but you can do it on your own if you don't
+want to use spring). Working with the streams might be a bit easier (depending on problem) once you
+are done with one particular entity you can simply detach it from session cache and garbage
+collector will do the rest.
 
 # Data removal
 
