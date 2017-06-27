@@ -125,3 +125,7 @@ h1.header {
 .post-content small {
   font-size: 0.8rem;
 }
+
+.post-content img {
+  max-width: 100%;
+}
