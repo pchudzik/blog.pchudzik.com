@@ -1,15 +1,27 @@
 /* Custom Stylesheet */
 
+/* break logo text on small device */
+@media (min-width: 500px) {
+  .display-on-small-screen {
+    display: none;
+  }
+}
+
 nav ul a,
 nav .brand-logo {
   color: #444;
 }
+
 p {
   line-height: 1.5rem;
 }
 
 p small {
   line-height: 1rem;
+}
+
+li p {
+  margin: 0;
 }
 
 .button-collapse {
@@ -126,6 +138,22 @@ h1.header {
   font-size: 0.8rem;
 }
 
+.post-content .small {
+  font-size: 0.8rem;
+}
+
+.post-content .small p {
+  margin: 0;
+}
+
+.post-content .small ul {
+  margin: 0;
+}
+
 .post-content img {
   max-width: 100%;
+}
+
+.post-content .center-image {
+  text-align: center;
 }
