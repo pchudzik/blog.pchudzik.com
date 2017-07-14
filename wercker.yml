@@ -3,8 +3,8 @@ box: debian
 build:
   steps:
     - script:
-        name: install git
-        code: apt-get update && apt-get install git -y
+        name: install git & asciidoctor
+        code: apt-get update && apt-get install git asciidoctor -y
 
     - script:
         name: download theme
