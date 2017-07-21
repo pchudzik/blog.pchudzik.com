@@ -23,7 +23,7 @@ modification will be reverted.
 
 We can start with something like this:
 
-```javascript
+{{<highlight javascript>}}
 it('should edit item', () => {
   //given
   const scope = $rootScope.$new();
@@ -40,7 +40,7 @@ it('should edit item', () => {
   //then
   expect(item.text).toEqual('New value');
 });
-```
+{{</highlight>}}
 
 It works, right? Sure. When reading test code do you care about button class? What will happen with
 all 21 tests if button class will be changed from save to save-item?
@@ -49,7 +49,7 @@ Let's refactor it to create more readable test.
 
 After second test you should notice that directive creation can be reused.
 
-```javascript
+{{<highlight javascript>}}
 function createDirective(item) {
   const scope = $rootScope.$new();
   scope.item = item;
@@ -58,20 +58,20 @@ function createDirective(item) {
   
   return element;
 }
-```
+{{</highlight>}}
 
 With new function we can easily create new directive:
 
-```javascript
+{{<highlight javascript>}}
 //given
 const item = {text: 'Old value'};
 const element = createDirective(item);
-```
+{{</highlight>}}
 
 We can go further with this and encapsulate how directive looks and how to trigger actions from the
 test.
 
-```javascript
+{{<highlight javascript>}}
 function createDirective(item) {
   // initial directive creation code
   element.startItemEdition = () => element.find('button.edit').click();
@@ -83,12 +83,11 @@ function createDirective(item) {
   element.saveChangedItem = () => element.find('button.save').click();
   // ...
 }
-
-```
+{{</highlight>}}
 
 With each iteration it looks better.
 
-```javascript
+{{<highlight javascript>}}
 //given
 const item = {text: 'Old value'};
 const element = createDirective(item);
@@ -100,11 +99,11 @@ element.saveChangedItem();
 
 //then
 expect(item.text).toEqual('New value');
-```
+{{</highlight>}}
 
 More complex operations can be gatherd in single function hidden inside createDirective function:
 
- ```javascript
+ {{<highlight javascript>}}
 function createDirective(item) {
   // initial directive creation code
   
@@ -116,11 +115,11 @@ function createDirective(item) {
   
   return element;
 }
-```
+{{</highlight>}}
 
 Now test is very easy to read:
 
-```javascript
+{{<highlight javascript>}}
 //given
 const item = {text: 'Old value'};
 const element = createDirective(item);
@@ -130,11 +129,11 @@ element.modifyItem('New value');
 
 //then
 expect(item.text).toEqual('New value');
-```
+{{</highlight>}}
 
 With existing methods it will be easy to test modification abort.
 
-```javascript
+{{<highlight javascript>}}
 //given
 const item = {text: 'Old value'};
 const element = createDirective(item);
@@ -146,12 +145,12 @@ element.cancelItemEdition(); //element.cancelItemEdition = () => element.find('b
 
 //then
 expect(item.text).toEqual('Old value');
-```
+{{</highlight>}}
 
 With this approach we are not restricted only to action execution. We can also encapsulate
 verifications. When item priority is high then background should be red.
 
-```javascript
+{{<highlight javascript>}}
 //given
 const item = {text: 'text', priority: 'urgent'};
 
@@ -160,7 +159,7 @@ const element = createDirective(item);
 
 //then
 expect(element.isHighlighted()).toEqual(true);    //element.isHighlighted = () => element.hasClass('important');
-```
+{{</highlight>}}
 
 When reading test do you really care about the shade of red? Or if it is css class. It doesn't
 matter. The important thing is that item must be highlighted. How it's achieved will be eventfully

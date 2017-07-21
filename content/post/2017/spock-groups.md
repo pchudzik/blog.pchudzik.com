@@ -57,18 +57,18 @@ compiles ;)</small>
 
 Let’s define test categories:
 
-```java
+{{<highlight groovy>}}
 package com.pchudzik.blog.spock.groups
 
 @interface Fast{}
 @interface Integration {}
 @interface Slow {}
 @interface Database {}
-```
+{{</highlight>}}
 
 Now create some tests which simulate “big project”:
 
-```java
+{{<highlight groovy>}}
 package com.pchudzik.blog.spock
 
 class NotAnnotatedTest extends Specification {
@@ -115,11 +115,11 @@ class RepositoryTest extends DatabaseSpecification {
     expect: true
   }
 }
-```
+{{</highlight>}}
 
 With those in place let's write helper class which will parse groups:
 
-```java
+{{<highlight groovy>}}
 class TestGroups {
   private static final groupDefinitions = [
       "fast" : "com.pchudzik.blog.spock.groups.Fast",
@@ -165,7 +165,7 @@ class TestGroups {
     group.startsWith("-")
   }
 }
-```
+{{</highlight>}}
 
 Using buildSrc directory I can write
 [tests](https://github.com/pchudzik/blog-example-spock-groups/blob/master/buildSrc/src/test/groovy/TestGroupsTest.groovy)
@@ -174,22 +174,21 @@ which will verify if my code works as expected, which is actually faster than ru
 
 The last step is to configure test groups in build.gradle:
 
-```java
-
+{{<highlight groovy>}}
 tasks.withType(Test) {
-	def testGroups = new TestGroups(System.getProperty("groups"))
+  def testGroups = new TestGroups(System.getProperty("groups"))
 
-	useJUnit {
-		includeCategories testGroups.includedGroups()
-		excludeCategories testGroups.excludedGroups()
-	}
+  useJUnit {
+    includeCategories testGroups.includedGroups()
+    excludeCategories testGroups.excludedGroups()
+  }
 }
-```
+{{</highlight>}}
 
 When everything is ready it's time to play a little and see how it's working. Let's start with
 something easy:
 
-```java
+{{<highlight text>}}
 ./gradlew test
 
 com.pchudzik.blog.spock.NotAnnotatedTest > should execute not categorized test STANDARD_OUT 
@@ -210,11 +209,11 @@ com.pchudzik.blog.spock.database.RepositoryTest > inherited test STANDARD_OUT
 com.pchudzik.blog.spock.database.IntegrationDbTest > integration test in database package STANDARD_OUT
     running integration test from database package
 BUILD SUCCESSFUL
-```
+{{</highlight>}}
 
 Ok. Now something more tricky:
 
-```java
+{{<highlight text>}}
 ./gradlew test -Dgroups=-db --rerun-tasks
 
 com.pchudzik.blog.spock.NotAnnotatedTest > should execute not categorized test STANDARD_OUT
@@ -230,12 +229,12 @@ com.pchudzik.blog.spock.database.OtherDatabaseReleatedTest > uncategorized test 
 com.pchudzik.blog.spock.database.IntegrationDbTest > integration test in database package STANDARD_OUT
     running integration test from database package
 BUILD SUCCESSFUL
-```
+{{</highlight>}}
 Awesome, all DB tests are skipped.
 
 What about something crazy:
 
-```java
+{{<highlight text>}}
 ./gradlew test --tests com.pchudzik.blog.spock.database.* --rerun-tasks -Dgroups=-db
 
 com.pchudzik.blog.spock.database.OtherDatabaseReleatedTest > uncategorized test from db package STANDARD_OUT
@@ -243,7 +242,7 @@ com.pchudzik.blog.spock.database.OtherDatabaseReleatedTest > uncategorized test 
 com.pchudzik.blog.spock.database.IntegrationDbTest > integration test in database package STANDARD_OUT
     running integration test from database package
 BUILD SUCCESSFUL
-```
+{{</highlight>}}
 
 And it works!
 

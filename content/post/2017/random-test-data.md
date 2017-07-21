@@ -48,7 +48,7 @@ objects creation, which is big plus.
 Consider flowing class (in our production application we had more fields to populate and state which
 revealed problem):
 
-```java
+{{<highlight java>}}
 class Article {
   private final Clock clock;
 
@@ -93,7 +93,7 @@ class Article {
     }
   }
 }
-```
+{{</highlight>}}
 
 In perfect world you should be able to just do: new Article() and be done with it, but sometimes
 it's not that simple and object creation might depend on external factors which are inconvenient or
@@ -102,7 +102,7 @@ or you want to mock some stuff for testing purposes. That's when object factorie
 
 You can easily create article instances with ArticlesFactory:
 
-```java
+{{<highlight java>}}
 @RequiredArgsConstructor
 class ArticleFactory {
   private final Clock systemClock;
@@ -115,11 +115,11 @@ class ArticleFactory {
     return new Article(systemClock);
   }
 }
-```
+{{</highlight>}}
 
 Now when you have production objects factory you can reuse it's logic for test data creation:
 
-```java
+{{<highlight java>}}
 public class TestArticleFactory {
   private static Clock fixedTime = new MutableClock();
 
@@ -137,7 +137,7 @@ public class TestArticleFactory {
     return article;
   }
 }
-```
+{{</highlight>}}
 
 And thats all. Note that from now on you can easily add additional logic to you test data factories
 to porpelly initialize objects and prepare them for testing phase. You'll need produce some extra

@@ -66,7 +66,7 @@ environment and H2 for local development. Tests and application will work on bot
 
 Model will be very simple. Two classes:
 
-```java
+{{<highlight java>}}
 @Entity
 @Table(name = "user_")
 @ToString(exclude = {"password", "roles"})
@@ -92,11 +92,11 @@ public class Role {
 
   private String name;
 }
-```
+{{</highlight>}}
 
 Two simple repositories:
 
-```java
+{{<highlight java>}}
 public interface RoleRepository extends JpaRepository<Role, Long> { }
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -119,12 +119,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Param("login") String login,
     @Param("role") Role role);
 }
-```
+{{</highlight>}}
 
 Nothing interesting in RoleRepository and not much in UserRepository but complexity is not the point
 here.
 
-```java
+{{<highlight groovy>}}
 class UserRepositoryTest extends RepositorySpecification {
   @Autowired
   UserRepository userRepository
@@ -174,7 +174,7 @@ class UserRepositoryTest extends RepositorySpecification {
     userRepository.userHasRole(user.login, otherRole) == false
   }
 }
-```
+{{</highlight>}}
 
 This is it now have tests which will fail in case of query has changed. It is safe to refactor and
 optimize. We are also future proof in case of any db or model change we will know from CI tool when
@@ -183,9 +183,11 @@ will work on production like db.
 
 To make it (almost) work all we need to do is to introduce RepositorySpecification:
 
-```java
+{{<highlight java>}}
 @Transactional
-@SpringApplicationConfiguration([RepositoryTestingApplication.class, TestConfiguration.class])
+@SpringApplicationConfiguration([
+  RepositoryTestingApplication.class, 
+  TestConfiguration.class])
 @TestPropertySource(properties = ["spring.profiles.active=dev,test"])
 abstract class RepositorySpecification extends Specification {
   @Configuration
@@ -200,14 +202,14 @@ abstract class RepositorySpecification extends Specification {
     }
   }
 }
-```
+{{</highlight>}}
 
 That's all repository specification is ready. Not much here either. We create test spring context
 and we use custom FlywayMigrationStrategy to make sure that postgres is cleared before migrations.
 
 Now we are almost ready to go there is only one additional step. We need configuration:
 
-```
+{{<highlight properties>}}
 # application.properties
 spring.profiles.active = dev
 
@@ -215,12 +217,12 @@ spring.jpa.hibernate.ddl-auto = validate
 spring.jpa.show-sql = true
 
 flyway.locations = ${db.migrations}
-```
+{{</highlight>}}
 
 Note that by default we are running with dev profile and we load flyway 
 migrations from property named db.migrations.
 
-```
+{{<highlight properties>}}
 # application-dev.properties
 spring.jpa.hibernate.ddl-auto = none
 
@@ -230,13 +232,12 @@ spring.datasource.password =
 
 db.type = h2
 db.migrations = db/migrations/core
-
-```
+{{</highlight>}}
 
 dev profile means that we run on in memory h2 database and we skip schema
 validation.
 
-```
+{{<highlight properties>}}
 # application-postgres.properties
 spring.datasource.url = jdbc:postgresql://localhost:5432/postgres
 spring.datasource.username = postgres
@@ -244,7 +245,7 @@ spring.datasource.password = secretpassword
 
 db.type = postgres
 db.migrations = db/migrations/core
-```
+{{</highlight>}}
 
 postgres profile differs only in DB connection details. But you can load custom migrations scripts
 on h2 and completely different on postgres. You can easily implement custom scripts which will work
@@ -255,10 +256,10 @@ The last step is database truncate before tests. If you load data as migrations 
 rid of it to make sure that your tests are not coupled with test data which might be modified in the
 future.
 
-```
+{{<highlight properties>}}
 # application-test.properties
 flyway.locations = ${db.migrations},db/migrations/truncate/${db.type}
-```
+{{</highlight>}}
 
 When running test profile all we need is default DB setup for "parent" profile with one additional
 step - truncate database. With db.type property it's possible to load dedicated scripts responsible

@@ -25,7 +25,7 @@ you can create spring beans "from code".
 Not sure why you might be interested in this since you can just annotate your class with @Component
 annotation but let's start from it.
 
-```java
+{{<highlight java>}}
 @RequiredArgsConstructor
 class DynamicBeanExample {
   private final String beanId;
@@ -46,7 +46,7 @@ class SingleDynamicBeanProcessor implements BeanFactoryPostProcessor {
     beanDefinitionRegistry.registerBeanDefinition("dynamicBean", dynamicBean);
   }
 }
-```
+{{</highlight>}}
 
 You can define scope, add constructor arguments, inject other beans, and set name of the bean.
 
@@ -59,7 +59,7 @@ bean instance.
 Creating single bean instance was easy. Creating multiple instances of the same bean is just putting
 bean creation in the loop ;) But let's complicate it a bit and use factory method instead:
 
-```java
+{{<highlight java>}}
 @Component
 class DynamicBeanFactoryProcessor implements BeanFactoryPostProcessor {
   @Override
@@ -80,7 +80,7 @@ class DynamicBeanFactoryProcessor implements BeanFactoryPostProcessor {
     return new DynamicBeanExample(beanId, testDependency);
   }
 }
-```
+{{</highlight>}}
 
 It works almost the same as constructor based initialization. You just pass arguments to factory
 method not constructor itself. This alone allows to do a lot of "interesting" things...
@@ -97,7 +97,7 @@ no environment, no beans. Only definitions of the objects that will be created b
 you need to do some work by yourself but with below example I'm sure you will be able to do whatever
 you want.
 
-```java
+{{<highlight java>}}
 @Component
 class ConfigurableBeanFactory implements BeanFactoryPostProcessor, InitializingBean {
   private List<String> beanInstances;
@@ -121,7 +121,7 @@ class ConfigurableBeanFactory implements BeanFactoryPostProcessor, InitializingB
         .split(","));
   }
 }
-```
+{{</highlight>}}
 
 First of all we are loading properties file. Loading it from application.properties doesn't make a
 lot of sense but it is just an example. You can load this from file, system properties, environment

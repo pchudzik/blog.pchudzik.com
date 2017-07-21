@@ -39,17 +39,17 @@ When using npm as dependencies manager it is very simple to find out outdated pa
 ```npm outadted``` ([docs](https://docs.npmjs.com/cli/outdated)) and you are good to go. Sample
 outdated command output
 
-```
+{{<highlight text>}}
 Package     Current  Wanted  Latest  Location
 angular       1.5.9   1.5.9   1.6.3  dependenices-update
 lodash        3.6.0   3.6.0  4.17.4  dependenices-update
 mocha         3.1.0   3.1.0   3.2.0  dependenices-update
-```
+{{</highlight>}}
 
 When you CI
 instance is configured you might want to create something more 'sophisticated':
 
-```bash
+{{<highlight bash>}}
 #!/bin/sh
 
 npm -s install
@@ -63,8 +63,7 @@ if [ $OUTDATED_PACKAGES_COUNT -ge $MAX_OUTDATED_PACKAGES ]; then
   printf '%b\n\n' "$OUTDATED_PACKAGES"
   exit $OUTDATED_PACKAGES_COUNT
 fi
-
-```
+{{</highlight>}}
 
 You call this script with parameter which will be the maximum number of acceptable outdated
 dependencies. Script is very simple and will exclude most of beta and release candidates.
@@ -76,7 +75,7 @@ dependencies. Script is very simple and will exclude most of beta and release ca
 To find outdated dependencies in gradle you can use [gradle versions
 plugin](https://github.com/ben-manes/gradle-versions-plugin). Sample output from versions plugin:
 
-```
+{{<highlight text>}}
 $> ./gradlew dependencyUpdates
 
 ------------------------------------------------------------
@@ -90,7 +89,7 @@ The following dependencies have later milestone versions:
  - org.apache.commons:commons-lang3 [3.4 -> 3.5]
  - junit:junit [3.8.1 -> 4.12]
  - org.springframework:spring-core [3.2.4.RELEASE -> 4.3.7.RELEASE]
-```
+{{</highlight>}}
 
 Output is a bit complex, but luckily there are also other formats (json and xml) which can be
 generated using ```-DoutputFormatter=json``` switch. Output report will be generated in
@@ -98,7 +97,8 @@ build/dependencyUpdates directory. Json support in bash doesn't exists, but you 
 [jq](https://stedolan.github.io/jq/manual/) for working with json in bash (```sudo apt-get install jq```).
 
 Or you can ask google for some advice on how to use sed and improvise:
-```bash
+
+{{<highlight shell>}}
 #!/bin/sh
 
 ./gradlew -DoutputFormatter=json dependencyUpdates > /dev/null 2>&1
@@ -112,8 +112,7 @@ if [ $OUDATED_DEPENDENCIES_COUNT -ge $MAX_OUTDATED_DEPENDENCIES ]; then
   printf '%b\n\n' "$(cat $REPORT)"
   exit $OUDATED_DEPENDENCIES_COUNT
 fi
-
-```
+{{</highlight>}}
 
 Now all you have to do is execute this script with single number param which will be maximum number
 of acceptable outdated libraries.
@@ -124,35 +123,38 @@ of acceptable outdated libraries.
 
 To find outdated libraries using maven you can use [versions-maven-plugin](http://www.mojohaus.org/versions-maven-plugin).
 Add versions plugin to your plugins section:
-```xml
+
+{{<highlight xml>}}
 <plugin>
   <groupId>org.codehaus.mojo</groupId>
   <artifactId>versions-maven-plugin</artifactId>
   <version>2.3</version>
 </plugin>
-```
+{{</highlight>}}
 
 Now you can display outdated packages using ```mvn versions:display-dependency-updates```. If you
 want to run this check on CI tool then we need to analyze versions output. Luckily we don't have to
 analyze all the stuff that maven produces. We can pass additional property value and save report to
 file. Just run
 
-```mvn versions:display-dependency-updates -Dversions.outputFile=target/outdated.txt``` 
+{{<highlight shell>}}
+mvn versions:display-dependency-updates -Dversions.outputFile=target/outdated.txt
+{{</highlight>}} 
 
 and versions plugin will plain text file with info what should be updated:
 
-```
+{{<highlight text>}}
 The following dependencies in Dependencies have newer versions:
   junit:junit ............................................ 3.8.1 -> 4.12
   org.apache.commons:commons-lang3 .......................... 3.4 -> 3.5
-```
+{{</highlight>}}
 
 The output file can be easily verified if there are outdated libraries.
 
 I like to use console for my day to day work, but I hate typing long commands so let's wrap it up
 into single reusable script which can be used on CI:
 
-```bash
+{{<highlight shell>}}
 #!/bin/sh
 
 MAX_OUTDATED_LIBRARIES=$1
@@ -169,7 +171,7 @@ if [ $OUTDATED_LIBRARIES -ge $MAX_OUTDATED_LIBRARIES ]; then
   printf '%b\n\n' "$(cat target/outdated.txt)"
   exit $OUTDATED_LIBRARIES
 fi
-```
+{{</highlight>}}
 
 As in previous examples to run script you must provide single argument which will be maximum number
 of acceptable outdated libraries

@@ -18,10 +18,10 @@ But when using final fields with hibernate you should be extra careful how you d
 
 First things first. To change value of final field all you need to do:
 
-```java
+{{<highlight java>}}
 Field finalField = Whatever.class.getDeclaredField("fieldName");
 finalField.setAccessible(true)
-```
+{{</highlight>}}
 
 and you are good to go. From now on your final field will be modifiable.
  
@@ -37,24 +37,24 @@ dangerous and might produce unexpected results.
 
 With simple java class:
 
-```java
+{{<highlight java>}}
 public class ByteCodeTest {
-	private Long number = 10L;
-	private final String inlined = "String to be inlined";
+  private Long number = 10L;
+  private final String inlined = "String to be inlined";
 
-	public String getInlined() {
-		return inlined;
-	}
+  public String getInlined() {
+    return inlined;
+  }
 
-	public Long getNumber() {
-		return number;
-	}
+  public Long getNumber() {
+    return number;
+ }
 }
-```
+{{</highlight>}}
 
 you can run javap -c ByteCodeTest.class and we will see:
 
-```
+{{<highlight text>}}
 Compiled from "ByteCodeTest.java"
 public class com.pchudzik.blog.immutable.ByteCodeTest {
   public com.pchudzik.blog.immutable.ByteCodeTest();
@@ -81,7 +81,7 @@ public class com.pchudzik.blog.immutable.ByteCodeTest {
        1: getfield      #5                  // Field number:Ljava/lang/Long;
        4: areturn
 }
-```
+{{</highlight>}}
 
 I've no idea how to read bytecod but using this [keywords
 reference](https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings). We can try to figure
@@ -98,7 +98,7 @@ convert primitive 10L value to Long object that's why it is not compile time con
 
 Since we know how it looks internally now we can trace how it works:
 
-```java
+{{<highlight java>}}
 static class ImmutableObject {
   private final String stringField = "can't touch this";
   private final Long longObjectField = 10L;
@@ -121,11 +121,11 @@ static class ImmutableObject {
     return "string=" + stringField + ",longObjectField=" + longObjectField + ",primitiveLong=" + primitiveLong;
   }
 }
-```
+{{</highlight>}}
 
 And quick look on how we can change final fields:
 
-```java
+{{<highlight java>}}
 final ImmutableObject object = new ImmutableObject();
 
 final Field stringField = ImmutableObject.class.getDeclaredField("stringField");
@@ -148,11 +148,11 @@ System.out.println("toString       = " + object.toString());
 System.out.println("string         = " + object.getStringField());
 System.out.println("long object    = " + object.getLongObjectField());
 System.out.println("primitive long = " + object.getPrimitiveLong());
-```
+{{</highlight>}}
 
 The output is following:
 
-```
+{{<highlight text>}}
 field access
 string         = Yes I can
 long object    = 11
@@ -162,7 +162,7 @@ toString       = string=can't touch this,longObjectField=11,primitiveLong=20
 string         = can't touch this
 long object    = 11
 primitive long = 20
-```
+{{</highlight>}}
 
 So we can change values of final fields, but not really? No, the answer is inlining. (I can not use
 fields directly because "Can't touch this" will be inlined in println as well") But you can debug

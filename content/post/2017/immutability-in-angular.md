@@ -17,13 +17,13 @@ Lately I've got a chance to implement something similar in new application. I co
 solution with all it's problems but since I was not happy about it I decided to do something
 different. My initial problem might look like this labels hierarchy:
 
-```
+{{<highlight text>}}
  X  Y
  \  /
   Z
  / \
 K   L
-```
+{{</highlight>}}
 
 When X changes we should check available Z values, when Z values are modified then K and L labels
 must be updated. Nothing significant happens when K or L values are modified. Labels are always
@@ -38,7 +38,7 @@ mind.
 
 First let's dive into the most important part of the code:
 
-```javascript
+{{<highlight javascript>}}
 function addCategory(category) {
     updateFormState({selectedCategories: [...$scope.formData.selectedCategories, category]});
   }
@@ -69,7 +69,7 @@ function updateFormState(newData) {
     tags: availableTags
   };
 }
-```
+{{</highlight>}}
 
 <small>[full
 source](https://github.com/pchudzik/blog-example-immutability-in-angular/blob/master/form.ctrl.js)</small>

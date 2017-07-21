@@ -13,8 +13,8 @@ to write something more generic and not language specific.
 
 <!--more-->
 
-```
+{{<highlight text>}}
 // For future reference:
 // header image - https://www.pexels.com/photo/technology-computer-desktop-source-code-113850/
 // footer image - https://www.pexels.com/photo/macbook-pro-macbook-computer-programming-60626/
-```
+{{</highlight>}}

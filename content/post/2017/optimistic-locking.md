@@ -40,14 +40,14 @@ important. Important is that it should not be accidental behavior but deliberate
 Let's start with plain SQL example of optimistic locking. Optimistic locking is very useful in
 update queries:
 
-```sql
+{{<highlight sql>}}
 update post
 set
   title = 'new title',
   content = 'new content'
 where
   id = 1
-```
+{{</highlight>}}
 
 In the above example object can be updated anytime query is executed. It doesn't matter if post has
 changed five times already. Title and content will be updated. When Bob starts post edition in the
@@ -56,7 +56,7 @@ might not be expected behavior. Usually we want to make sure that users will not
 people's work:
 
 
-```sql
+{{<highlight sql>}}
 update post
 set
   title = 'new title',
@@ -65,7 +65,7 @@ set
 where
   id = 1
   and version = 1
-```
+{{</highlight>}}
 
 Now when Bob saves his post version after lunch nothing is changed because Alice updated post in the
 meantime and Bob's query will not match any records.
@@ -90,7 +90,7 @@ locking can't help you if you are not using it.
 Let's write some code to see what's going on and why version must be used properly to work as
 expected. First take a look at the model:
 
-```java
+{{<highlight java>}}
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -115,11 +115,11 @@ public class Post {
     this.content = newContent;
   }
 }
-```
+{{</highlight>}}
 
 Our entity is very simple and we can send entity directly to the client:
 
-```java
+{{<highlight groovy>}}
 def "working optimistic locking when using entityManager.merge"() {
   given: "Bob saves first post version"
   final firstPostVersion = transactionTemplate.execute({ status ->
@@ -143,7 +143,7 @@ def "working optimistic locking when using entityManager.merge"() {
   then: "conflict is expected because Alice updated post while Bob was editing it"
   thrown OptimisticLockException
 }
-```
+{{</highlight>}}
 
 As you can see in then block hibernate handlers optimistic locking properly and will throw
 javax.persistence.OptimisticLockException when we try to save outdated entity. It is still your job
@@ -158,18 +158,18 @@ Sending DTOs to the client might be tricky because it is your responsibility to 
 properly. If you skip version field in your DTO you might end up with users overwriting each other
 work:
 
-```java
+{{<highlight java>}}
 @Data
 class PostDtoWithoutVersion {
   private final Long id;
   private String title;
   private String content;
 }
-```
+{{</highlight>}}
 
 And simple test proving the point:
 
-```java
+{{<highlight groovy>}}
 def "optimistic locking failure without sending version to the client"() {
   given: "Bob saves first post version"
   final postId = transactionTemplate.execute({ status ->
@@ -212,7 +212,7 @@ def "optimistic locking failure without sending version to the client"() {
   postInDb.title == "Bob's title"
   postInDb.content == "Bob's content"
 }
-```
+{{</highlight>}}
 
 In the above example hibernate has no idea what is going on and it can not help you with optimistic
 locking. We just tell it to load latest version from DB apply changes on it and persist it. Without
@@ -220,7 +220,7 @@ proper version control Bob will overwrite all changes made by Alice.
 
 To avoid this issue we can simply send version to the client:
 
-```java
+{{<highlight java>}}
 @Data
 public class PostDto {
   private final Long id;
@@ -228,10 +228,10 @@ public class PostDto {
   private String title;
   private String content;
 }
-```
+{{</highlight>}}
 
 And everything will work like in the first test case:
-```java
+{{<highlight groovy>}}
 def "working optimistic locking when sending version to the client"() {
   given: "Bob saves first post version"
   final Post firstPostVersion = transactionTemplate.execute({ status ->
@@ -268,12 +268,11 @@ def "working optimistic locking when sending version to the client"() {
   then:
   thrown OptimisticLockException
 }
-
-```
+{{</highlight>}}
 
 Additional method is required which will make sure we are working with proper post version:
 
-```java
+{{<highlight java>}}
 private Post findPost(Long id, Long version) {
   final post = entityManager.find(Post.class, id)
   if (post.version != version) {
@@ -281,7 +280,7 @@ private Post findPost(Long id, Long version) {
   }
   return post
 }
-```
+{{</highlight>}}
 
 Fetching whole entity just to check version might not be the best idea, but it works for our
 example. In real world DB should do version checking for you (from Post where id = :id and version =

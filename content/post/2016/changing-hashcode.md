@@ -50,7 +50,7 @@ implementation hashCode and equals. You can find all code samples on
 
 Consider following sample class:
 
-```java
+{{<highlight java>}}
 package com.pchudzik.hashcode;
 
 import java.util.Objects;
@@ -78,7 +78,7 @@ class InconsistentHashCode {
     return Objects.hash(name, age);
   }
 }
-```
+{{</highlight>}}
 
 Pretty obvious implementation I'm sure everybody did at least once. At first equals and hashCode
 contract requirements are fulfilled but what about the one in hashCode: ```Whenever it is invoked on
@@ -87,7 +87,7 @@ consistently return the same integer```
  
 What can happen if I ignore this requirement? let's check it:
 
-```java
+{{<highlight groovy>}}
 def "hashCode value should be consistent during execution of application set.contains example"() {
   given:
   final hashCode = new InconsistentHashCode(name: "John", age: 21)
@@ -101,22 +101,22 @@ def "hashCode value should be consistent during execution of application set.con
   then:
   set.contains(hashCode)
 }
-```
+{{</highlight>}}
 
 Test failure:
 
-```
+{{<highlight text>}}
 Condition not satisfied:
 
 set.contains(hashCode)
 |   |        |
 |   false    com.pchudzik.hashcode.InconsistentHashCode@446d820
 [com.pchudzik.hashcode.InconsistentHashCode@446d820]
-```
+{{</highlight>}}
 
 Ok then. What else can happen if I implement hashCode incorrectly?
 
-```java
+{{<highlight groovy>}}
 def "hashCode value should be consistent during execution of application set.add example"() {
   given:
   final hashCode = new InconsistentHashCode(name: "John", age: 21)
@@ -130,11 +130,11 @@ def "hashCode value should be consistent during execution of application set.add
   then:
   set.add(hashCode) == false
 }
-```
+{{</highlight>}}
 
 and result:
 
-```
+{{<highlight text>}}
 Condition not satisfied:
 
 set.add(hashCode) == false
@@ -142,11 +142,11 @@ set.add(hashCode) == false
 |   true|         false
 |       com.pchudzik.hashcode.InconsistentHashCode@446d820
 [com.pchudzik.hashcode.InconsistentHashCode@446d820, com.pchudzik.hashcode.InconsistentHashCode@446d820]
-```
+{{</highlight>}}
 
 The further it goes the more interesting it gets:
 
-```java
+{{<highlight groovy>}}
 def "hashCode value should be consistent during execution of application set.size example"() {
   given:
   final hashCode = new InconsistentHashCode(name: "John", age: 21)
@@ -163,18 +163,18 @@ def "hashCode value should be consistent during execution of application set.siz
   then:
   set.size() == 1
 }
-```
+{{</highlight>}}
 
 and it fails miserably:
 
-```
+{{<highlight text>}}
 Condition not satisfied:
 
 set.size() == 1
 |   |      |
 |   2      false
 [com.pchudzik.hashcode.InconsistentHashCode@446d820, com.pchudzik.hashcode.InconsistentHashCode@446d820]
-```
+{{</highlight>}}
 
 If you think about it all makes sense, the problem is we rarely think about real impact of hashCode
 implementation especially when new hot features are expected to be delivered asap.

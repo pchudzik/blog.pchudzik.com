@@ -29,7 +29,7 @@ of unit tests very hard.
 
 Product class:
 
-```java
+{{<highlight java>}}
 @RequiredArgsConstructor
 class Product {
   private final String name;
@@ -50,11 +50,11 @@ class Product {
 
   public Set<Tag> getPossibleTags() { /*...*/ }
 }
-```
+{{</highlight>}}
 
 Two additional which will simulate test object setup complexity:
 
-```java
+{{<highlight java>}}
 class Category {
   private String name;
 
@@ -68,7 +68,7 @@ class Category {
 class Tag {
   private String name;
 }
-```
+{{</highlight>}}
 
 I’m going to focus on implementation of Product class which can be assigned to single category
 inside tree branch. Product can be assigned to multiple categories in different tree branches. Tags
@@ -79,7 +79,7 @@ Let’s write some tests to make sure our code works. But do I really need to cr
 categories for all the tests? Since each test setup is basically the same. Create product, do stuff
 with categories on product, verify behaviour. So let’s start by creating category tree:
 
-```java
+{{<highlight groovy>}}
 def rootCategory1TagA = new Tag(name: "A")
 def rootCategory1TagB = new Tag(name: "B")
 def rootCategory2TagC = new Tag(name: "C")
@@ -106,10 +106,10 @@ def otherChildOfRootCategory2 = new Category(
         
 rootCategory1.childCategories.addAll([child1OfRootCategory1, child2OfRootCategory1])
 rootCategory2.childCategories.addAll(otherChildOfRootCategory2)
-```
+{{</highlight>}}
 
 When tree and tags are ready we can write some tests:
-```java
+{{<highlight groovy>}}
 def "product can be assign to only one category in category tree branch"() {
   given:
   final product = new Product("product")
@@ -166,7 +166,7 @@ def "should exclude already assigned tag from possible tags"() {
   expect:
   product.possibleTags == [child1TagE] as Set
 }
-```
+{{</highlight>}}
 
 All good? No, not really. If you’ve actually read test code you probably jumped back and forward few
 times to find out what is the real test setup and how the category tree looks like in order to
@@ -203,9 +203,9 @@ Test object factories. When object creation is complicated, and objects required
 subject are complex by themselves than responsibility of simplifying object creation can be
 delegated to test factories:
  
-```java
-createCategoryWithChildren(“category”, [anyCategory(“child1”), [anyCategory(“child2”)].
-```
+{{<highlight groovy>}}
+createCategoryWithChildren("category", [anyCategory("child1"), [anyCategory("child2")])
+{{</highlight>}}
 
 This way you work with real objects, complex object creation is hidden in other class. What’s more
 test factory might hide implementation changes from other tests (for example constructor change, or
