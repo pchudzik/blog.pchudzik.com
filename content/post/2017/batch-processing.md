@@ -74,7 +74,7 @@ requires public method) or fallback to plain
 [TransactionTemplate](https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/transaction/support/TransactionTemplate.html)
 which will allow to hide some of the implementation details.
 
-````java
+{{<highlight java>}}
 @Component
 @RequiredArgsConstructor
 class DataInsert {
@@ -101,7 +101,7 @@ class DataInsert {
     entityManager.clear();
   }
 }
-````
+{{</highlight>}}
 
 Note flush and clear (in that order, otherwise nothing will be persisted) executed once in awhile.
 
@@ -110,7 +110,7 @@ Note flush and clear (in that order, otherwise nothing will be persisted) execut
 
 ## Plain JPA
 
- ```java
+{{<highlight java>}}
 @Component
 @RequiredArgsConstructor
 class JpaIterable implements Iterable<Product> {
@@ -164,7 +164,7 @@ class JpaIterable implements Iterable<Product> {
     }
   }
 }
-```
+{{</highlight>}}
 
 We can create stupid simple iterator which is responsible for fetching next page when we've fetched
 all data on current page. Above is not perfect implementation but will do for the simplest use
@@ -187,7 +187,7 @@ details (;)) you can take advantage of
 [ScrollableResult](http://docs.jboss.org/hibernate/orm/5.2/javadocs/org/hibernate/ScrollableResults.html)
 which allows to do exactly the same we did in plain JPA.
 
-```java
+{{<highlight java>}}
 @Component
 @RequiredArgsConstructor
 class HibernateIterable implements Iterable<Product> {
@@ -245,7 +245,7 @@ class HibernateIterable implements Iterable<Product> {
     }
   }
 }
-```
+{{</highlight>}}
 
 Like in plain JPA example we still can squeeze and hide hibernate implementation in standard java
 interfaces (note that it is more complicated than plain JPA, but it is still worth considering when
@@ -262,13 +262,12 @@ things](https://docs.jboss.org/hibernate/orm/5.2/userguide/html_single/Hibernate
 Spring data supports java8 streams so there is not much to there. Just create repository and make
 sure you'll return stream of entities:
 
-```java
+{{<highlight java>}}
 interface SpringDataStream extends Repository<Product, Long> {
   @Query("from Product order by id")
   Stream<Product> findProducts();
 }
-
-```
+{{</highlight>}}
 
 One thing worth mentioning is that once you are done with the stream it should be closed (you can
 close it manually in the final block, or wrap it in the try with the resource block).

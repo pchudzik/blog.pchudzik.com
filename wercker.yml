@@ -4,7 +4,7 @@ build:
   steps:
     - script:
         name: install git & asciidoctor
-        code: apt-get update && apt-get install git asciidoctor -y
+        code: apt-get update && apt-get install -y git asciidoctor python-pygments
 
     - script:
         name: download theme
