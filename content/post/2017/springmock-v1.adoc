@@ -7,9 +7,9 @@ date: "2017-07-23"
 ---
 
 I've been using springboot for some time now, but there was that one thing that bugged me a lot.
-While writing integration tests with mocks you are forced to use mockito as mocking library. That's
-great and easy to understand if you are not using spock. The problem is that in spock there are
-better ways to mock stuff...
+While writing integration tests with mocks you are forced to use mockito as the mocking library.
+That's great and easy to understand if you are not using spock. The problem is that in spock there
+are better ways to mock stuff...
 
 <!--more-->
 
@@ -26,7 +26,7 @@ Because why not :P
 
 Up until now I've been using mockito mocks and mockito syntax in spock integration tests. It was the
 easiest and the most obvious way to work with mocks. Of course there is this ugly workaround which
-allows to inject spock mocks into specification (thanks to release DetachedMocks from
+allows to inject spock mocks into specification (thanks to release of DetachedMocks from
 http://spockframework.org/spock/docs/1.1/release_notes.html[spock 1.1]):
 
 {{<highlight java>}}
@@ -42,15 +42,15 @@ static class Config {
 {{</highlight>}}
 
 But when you look at it there is a lot of boilerplate (and most of it is hidden from you) which is
-not required when using `@MockBean` or `@SpyBean`. Why is spock treated as second class citizen you
-might ask? Why are you forced to create 'custom' mocks that way? Why mockito is the only right
+not required when using `@MockBean` or `@SpyBean`. Why is spock treated as a second class citizen
+you might ask? Why are you forced to create 'custom' mocks that way? Why mockito is the only right
 mocking library to mock stuff?
 
 Lately I've got some time off and decided it will be fun to dive into spring source code and see how
 it's working and what can I do to inject spock mocks instead of mockito mocks. I
 https://github.com/spring-projects/spring-boot/issues/9372[suggested] that I can refactor it in
 spring but the idea was rejected and spring guys suggested that it can be pulled out of the spring.
-Instead off pulling it out as is I decided it will be more educational to figure some of this stuff
+Instead of pulling it out as is I decided it will be more educational to figure some of this stuff
 on my own and that's exactly what I did. I've started developing
 https://github.com/pchudzik/springmock[springmock] library for fun and now after some time I have
 something to show.
@@ -62,7 +62,7 @@ mocking library as mocks and spies provider. Right now only spock and mockito ar
 important thing here is that with springmock you can easily create and inject spock mocks into spock
 Specification (mockito support is there to prove that the idea of mocks providers might work).
 
-One example will tell more then 1000 words so here is what I've got now:
+One example will tell more than 1000 words so here is what I've got now:
 
 {{<highlight groovy>}}
 @SpringBootTest
@@ -103,15 +103,15 @@ specification +
 <2> `@AutowiredSpy` will locate existing bean in the spring context and replace it with the spy +
 <3> you can mix springmock annotations with `@MockBean` and `@SpyBean` already available in
 spring-test +
-<4> configure behaviour of spock mock +
+<4> configure behavior of spock mock +
 <5> verify spock spy call +
-<6> verify mockito mock behaviour
+<6> verify mockito mock behavior
 
 What I've got is MVP. You can register and inject mocks and you can create spies from already
 registered objects and that's all for now. When I'll have free time I'm going to implement more
 features like java7 compatibility and additional mocks and spies configuration.
 
-If you are still interested but not yet convinced you can checkout:
+If you are still interested but not yet convinced you can check out:
 
 * https://github.com/pchudzik/springmock/tree/master/samples/mockito-samples[sample project using
 spring-boot, maven junit and mockito]
@@ -123,7 +123,7 @@ spring-boot, gradle and spock]
 tests for spock support]
 
 You don't need springboot to use springmock. Sample projects are based on springboot because it's
-the fastest way to get this running but checkout integration tests there is no springboot there.
+the fastest way to get this running but check out integration tests there is no springboot there.
 
 == How to get it
 
@@ -156,7 +156,7 @@ https://github.com/pchudzik/springmock#snapshots[snapshot release].
 
 In both maven and gradle it is your job to
 https://github.com/pchudzik/springmock#requirements[provide mockito|spock and spring-test]
-dependencies (spring-boot-starter-tests ships with mockito and spring-test). What's more as for
+dependencies (spring-boot-starter-tests ships with mockito and spring-test). What's more, as for
 right now java8 is a must to use springmock.
 
 To find out latest available version you check out
