@@ -3,7 +3,7 @@ title: "Introducing springmock"
 Tags: ["java", "groovy", "spock", "spring", "springmock"]
 Categories: ["java", "groovy"]
 description: "An alternative spring mocking infrastructure"
-date: "2017-07-23"
+date: "2017-07-25"
 ---
 
 I've been using springboot for some time now, but there was that one thing that bugged me a lot.
