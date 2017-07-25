@@ -1,0 +1,171 @@
+---
+title: "Introducing springmock"
+Tags: ["java", "groovy", "spock", "spring", "springmock"]
+Categories: ["java", "groovy"]
+description: "An alternative spring mocking infrastructure"
+date: "2017-07-23"
+---
+
+I've been using springboot for some time now, but there was that one thing that bugged me a lot.
+While writing integration tests with mocks you are forced to use mockito as mocking library. That's
+great and easy to understand if you are not using spock. The problem is that in spock there are
+better ways to mock stuff...
+
+<!--more-->
+
+== tl;dr
+
+I've created https://github.com/pchudzik/springmock[springmock] library which allows to inject spock
+mocks into spock's Specification classes. It allows to use spock or mockito as mocks provider. Just
+add `com.pchudzik.springmock:springmock-spock:1.0.0` (or `springmock-mockito` for mockito) to your
+dependencies and start using `@AutowiredMock` and `@AutowiredSpy` in your tests.
+
+== Why?
+
+Because why not :P
+
+Up until now I've been using mockito mocks and mockito syntax in spock integration tests. It was the
+easiest and the most obvious way to work with mocks. Of course there is this ugly workaround which
+allows to inject spock mocks into specification (thanks to release DetachedMocks from
+http://spockframework.org/spock/docs/1.1/release_notes.html[spock 1.1]):
+
+{{<highlight java>}}
+@Configuration
+static class Config {
+  private final mockFactory = new DetachedMockFactory()
+
+  @Bean
+  Service service() {
+    mockFactory.Mock(Service.class)
+  }
+}
+{{</highlight>}}
+
+But when you look at it there is a lot of boilerplate (and most of it is hidden from you) which is
+not required when using `@MockBean` or `@SpyBean`. Why is spock treated as second class citizen you
+might ask? Why are you forced to create 'custom' mocks that way? Why mockito is the only right
+mocking library to mock stuff?
+
+Lately I've got some time off and decided it will be fun to dive into spring source code and see how
+it's working and what can I do to inject spock mocks instead of mockito mocks. I
+https://github.com/spring-projects/spring-boot/issues/9372[suggested] that I can refactor it in
+spring but the idea was rejected and spring guys suggested that it can be pulled out of the spring.
+Instead off pulling it out as is I decided it will be more educational to figure some of this stuff
+on my own and that's exactly what I did. I've started developing
+https://github.com/pchudzik/springmock[springmock] library for fun and now after some time I have
+something to show.
+
+== To the point
+
+https://github.com/pchudzik/springmock[springmock] allows to inject mocks and create spies using any
+mocking library as mocks and spies provider. Right now only spock and mockito are supported. The
+important thing here is that with springmock you can easily create and inject spock mocks into spock
+Specification (mockito support is there to prove that the idea of mocks providers might work).
+
+One example will tell more then 1000 words so here is what I've got now:
+
+{{<highlight groovy>}}
+@SpringBootTest
+class SpockSamplesApplicationTest extends Specification {
+  @AutowiredMock //<1>
+  AddOneTranslator addOneTranslator
+
+  @AutowiredSpy  //<2>
+  TwoRepository twoRepository
+
+  @MockBean      //<3>
+  LogService logService
+
+  @Autowired
+  MyService myService
+
+  def "should calculate values"() {
+    given:
+    final inputA = 1
+    final translatedA = 10
+    final expectedResult = translatedA + TWO
+
+    addOneTranslator.addOne(inputA) >> translatedA  //<4>
+
+    when:
+    final result = myService.calculate(inputA)
+
+    then:
+    1 * twoRepository.getTwo()  //<5>
+    result == expectedResult
+
+    Mockito.verify(logService).logCall(inputA, expectedResult) // <6>
+  }
+}
+{{</highlight>}}
+<1> simply use `@AutowiredMock` which will register bean in the context and inject mock to
+specification +
+<2> `@AutowiredSpy` will locate existing bean in the spring context and replace it with the spy +
+<3> you can mix springmock annotations with `@MockBean` and `@SpyBean` already available in
+spring-test +
+<4> configure behaviour of spock mock +
+<5> verify spock spy call +
+<6> verify mockito mock behaviour
+
+What I've got is MVP. You can register and inject mocks and you can create spies from already
+registered objects and that's all for now. When I'll have free time I'm going to implement more
+features like java7 compatibility and additional mocks and spies configuration.
+
+If you are still interested but not yet convinced you can checkout:
+
+* https://github.com/pchudzik/springmock/tree/master/samples/mockito-samples[sample project using
+spring-boot, maven junit and mockito]
+* https://github.com/pchudzik/springmock/tree/master/mockito/src/test/java/com/pchudzik/springmock/mockito/test[integration
+tests for mockito support]
+* https://github.com/pchudzik/springmock/tree/master/samples/spock-samples[sample project using
+spring-boot, gradle and spock]
+* https://github.com/pchudzik/springmock/tree/master/spock/src/test/groovy/com/pchudzik/springmock/spock/test[integration
+tests for spock support]
+
+You don't need springboot to use springmock. Sample projects are based on springboot because it's
+the fastest way to get this running but checkout integration tests there is no springboot there.
+
+== How to get it
+
+You can try it yourself just add dependency to springmock and you are good to go:
+
+{{<highlight xml>}}
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-test</artifactId>
+  <scope>test</scope>
+</dependency>
+<dependency>
+  <groupId>com.pchudzik.springmock</groupId>
+  <artifactId>springmock-mockito</artifactId>
+  <version>1.0.0</version>
+  <scope>test</scope>
+</dependency>
+{{</highlight>}}
+
+or gralde
+{{<highlight groovy>}}
+testCompile('com.pchudzik.springmock:springmock-spock:1.0.0')
+testCompile('org.springframework.boot:spring-boot-starter-test')
+testCompile('org.spockframework:spock-core:1.1-groovy-2.4')
+testCompile('org.spockframework:spock-spring:1.1-groovy-2.4')
+{{</highlight>}}
+
+If you want latest not yet stable features you can fetch
+https://github.com/pchudzik/springmock#snapshots[snapshot release].
+
+In both maven and gradle it is your job to
+https://github.com/pchudzik/springmock#requirements[provide mockito|spock and spring-test]
+dependencies (spring-boot-starter-tests ships with mockito and spring-test). What's more as for
+right now java8 is a must to use springmock.
+
+To find out latest available version you check out
+https://github.com/pchudzik/springmock/blob/master/README.md[readme file]. Remember that you can use
+it along with spring `@MockBean` and `@SpyBean` and you don't need springboot to use it so you are
+not forced to refactor all your tests. If you decide to give it a try please
+https://github.com/pchudzik/springmock/issues/new[let me know about any bugs] I've missed. Don't
+hesitate to https://github.com/pchudzik/springmock/issues/new[request new features] there is a good
+chance that I'll implement them.
+
+Up to date instructions are always on https://github.com/pchudzik/springmock[github]. Have fun
+mocking stuff :)
