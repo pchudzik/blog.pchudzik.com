@@ -157,3 +157,7 @@ h1.header {
 .post-content .center-image {
   text-align: center;
 }
+
+.post-content .lead {
+  font-size: 1.2em;
+}

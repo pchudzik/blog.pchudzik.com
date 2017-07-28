@@ -14,7 +14,8 @@ most of the time remotely.
 <!--more-->
 
 
-=== Lesson learned good onboarding will produce not so confused employee
+[.lead]
+Lesson learned good onboarding will produce not so confused employee
 
 I started as a java developer and my first task was to create a tool which will be able to import
 data into the system under active development. There was no time to do it manually before the
@@ -27,7 +28,8 @@ produce working solution.
 image::/images/content/201707/summary-time/words_worst_webiste.jpg[World worst webiste]
 
 
-=== Lesson learned never leave anyone without supervision for too long especially when time is crucial
+[.lead]
+Lesson learned never leave anyone without supervision for too long especially when time is crucial
 
 Meanwhile, there was the problem with UI development and it was the time when I've learned that it's
 possible to do something more useful than falling snowflakes in javascript ;) I've learned angular
@@ -35,7 +37,8 @@ and all the tooling around it. With the help of the team, we picked up frontend 
 deliver it on time. When someone is not producing results for too long ask what is going on and
 expect results. If there is nothing for too long then it is time to act.
 
-=== Lesson learned if everything is working do not cut in into the process
+[.lead]
+Lesson learned if everything is working do not cut in into the process
 
 Now we were a good functional team. There were some personnel changes but we were able to keep good
 atmosphere and idea of good quality in mind. After first release (which went smoothly) new project
@@ -45,7 +48,8 @@ was on the horizon...
 image::/images/content/201707/summary-time/commute.jpeg[Commute]
 
 
-=== Lesson learned when working remotely have your routines which will get you into "you are in the office, do your job" state
+[.lead]
+Lesson learned when working remotely have your routines which will get you into "you are in the office, do your job" state
 
 In the meantime, I've decided to go 100% remote (team was scattered all across Poland) from my
 perspective there was no reason to commute to the office since I was working remotely already.
@@ -57,7 +61,8 @@ procedure allowed to fool my brain into thinking now you are in the office do yo
 my morning, lunch and afternoon routines which allowed to easily get in and out of the office.
 
 
-=== Lesson learned don't force your ideas just because they are yours. Talk about them, argue, discuss and listen to other members of the team and eventually everything will land just fine
+[.lead]
+Lesson learned don't force your ideas just because they are yours. Talk about them, argue, discuss and listen to other members of the team and eventually everything will land just fine
 
 Sometime after I went remote new project was assigned to our team (we already had two on production
 in the maintenance mode with a new feature to developed once in a while). It was the first project
@@ -69,7 +74,8 @@ able to sell my idea and it was accepted. Sometimes team convinced me to do some
 different way (I was the stubborn one ;)) or implement something using new technology.
 
 
-=== Lesson learned let the team improve the process
+[.lead]
+Lesson learned let the team improve the process
 
 Technologies used in this project were http://imgur.com/qZA9Cow[not developer friendly] but with a
 bit of the effort we were able to isolate ourselves from it. For the first release it wasn't yet
@@ -82,14 +88,16 @@ to be possible :)
 image::/images/content/201707/summary-time/broken.jpeg[Broken]
 
 
-=== Lesson learned don't give up easily
+[.lead]
+Lesson learned don't give up easily
 
 Not everything was so shiny there were also failures. From my perspective the biggest one is
 agreeing to do the project with the tools which were not optimal for the job. I should've come up
 with ideas on what can be done about it and discuss them more aggressively with architects.
 
 
-=== Lesson learned make sure everyone in the team knows a little about a lot
+[.lead]
+Lesson learned make sure everyone in the team knows a little about a lot
 
 We were still maintaining two older systems. The oldest one started to look a bit like a legacy
 software... It was time to do something about it. I was able to sell the idea of refactoring it. It
@@ -102,7 +110,8 @@ with it.
 image::/images/content/201707/summary-time/hand.jpg[Thumb up]
 
 
-=== Lesson learned working remotely does work and produces results
+[.lead]
+Lesson learned working remotely does work and produces results
 
 We all were working 100% remote (not offline, but remote, we had office hours and daily meetings).
 There is nothing wrong with remote team. There are challenges but with proper management and
