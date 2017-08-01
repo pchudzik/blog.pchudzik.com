@@ -1,0 +1,128 @@
+---
+title: "Events in spring"
+Tags: ["java", "spring", "basics", "howto"]
+Categories: ["java"]
+description: "How to work with events in spring"
+date: "2017-08-01"
+---
+
+With spring 4.2 (released more than one year ago) serious improvements regarding embedded events
+were made. You probably already know it, but I've never had a chance to properly investigate it.
+Lately, when digging into code base of the system I'm currently working on I got an opportunity to
+see it in action and after quick glimpse, I decided to investigate it a bit further.
+
+<!--more-->
+
+To dispatch an event all you need to do is to inject ApplicationEventPublisher and call
+http://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/ApplicationEventPublisher.html#publishEvent-java.lang.Object-[publishEvent]
+
+{{<highlight java>}}
+@RequiredArgsConstructor
+@Service
+public class LabelService {
+  private final ApplicationEventPublisher eventPublisher;
+
+  public Category createCategory(String name) {
+    final Category category = new Category(name);
+    eventPublisher.publishEvent(new LabelCreated<>(category));
+    return category;
+  }
+}
+{{</highlight>}}
+
+To handle event just annotate method with
+http://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/event/EventListener.html[@EventListener]
+and add expected event object as method param.
+
+{{<highlight java>}}
+@Slf4j
+@Service
+public class MobilePushNotificationService {
+  @EventListener
+  public void handleUserCreatedAction(UserCreatedEvent event) {
+    log.info("Mobile notification: User created {}", event.getUser());
+  }
+}
+{{</highlight>}}
+
+Spring will be able to select proper listener when handling generic events (note
+http://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/ResolvableTypeProvider.html[ResolvableTypeProvider]
+which allows to properly resolve generics in the runtime by the framework):
+
+{{<highlight java>}}
+@Getter
+@RequiredArgsConstructor
+public class LabelCreated<T extends Label> implements ResolvableTypeProvider {
+  private final T label;
+
+  @Override
+  public ResolvableType getResolvableType() {
+    return ResolvableType.forClassWithGenerics(getClass(), label.getClass());
+  }
+}
+
+@Slf4j
+@Service
+class LabelNotificationService {
+  @EventListener
+  public void onCategoryCreation(LabelCreated<Category> event) {
+    log.info("Category created {}. Sending for acceptance", event.getLabel());
+  }
+}
+{{</highlight>}}
+
+You can filter and react on events using
+https://docs.spring.io/spring/docs/current/spring-framework-reference/html/expressions.html[SpEL].
+To apply SpEL use
+http://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/event/EventListener.html#condition--[condition
+attribute]. What's more EventListener can be even bound to current transaction. To handle the event
+inside the transaction use
+http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/transaction/event/TransactionalEventListener.html[@TransactionalEventListener].
+
+{{<highlight java>}}
+@Slf4j
+@Service
+class PublishedArticleNotifier {
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onArticleCreated(ArticleCreatedEvent event) {
+    log.info("Publishing article {} to facebook", event.getArticle());
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+  public void articleSaveFailure(ArticleCreatedEvent event) {
+    log.info("Publishing article {} save failure to backup storage", event.getArticle());
+  }
+
+  @EventListener(condition = "#event.updateType == T(com.pchudzik.blog.example.springevents.article.Article.UpdateType).MAJOR")
+  public void onArticleUpdate(ArticleUpdateEvent event) {
+    log.info("Sending notification to the author about major article update {}", event.getArticle());
+  }
+}
+{{</highlight>}}
+
+Event handling code can be executed asynchronously. Annotate method or class with
+http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/scheduling/annotation/Async.html[@Async]
+and remember to
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/scheduling/annotation/EnableAsync.html[enable
+asynchronous support] and you are good to go.
+
+{{<highlight java>}}
+@Slf4j
+@Service
+@Async
+class EmailNotificationService {
+  @EventListener
+  public void handleUserCreatedAction(UserCreatedEvent event) {
+    log.info("Email: User created {}", event.getUser());
+  }
+}
+{{</highlight>}}
+
+That's all for now. As you can see dispatching events and handling them in your application is really
+easy with spring framework. What's more, it is possible and very easy to take advantage of advanced
+spring features like transaction management and asynchronous events handling.
+
+[.small]
+--
+All code samples can be found on my https://github.com/pchudzik/blog-example-events-in-spring[GitHub].
+--
