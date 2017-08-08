@@ -7,20 +7,20 @@ date: "2017-06-13"
 ---
 
 Some time ago I noticed new library in our code base - [Random
-Beans](https://github.com/benas/random-beans) which as the name suggest is tool developed to easily
-create random data and random objects for testing purposes. Unfortunately we used it in the wrong
-way. Here's how we backed up from the the random test data to regain control over testing.
+Beans](https://github.com/benas/random-beans) which as the name suggests is a tool developed to
+easily create random data and random objects for testing purposes. Unfortunately, we used it in the
+wrong way. Here's how we backed up from the random test data to regain control over testing.
 
 <!--more-->
 
 # tl;dr
 
 Don't use random data to populate objects with logic. <small>Thanks captain obvious ;)</small>.
-Random tests input is not good idea because:
+Random tests input is not a good idea because:
 
-* if with particular test input you expected specification to fail then its corner case and should be
-  handled in dedicated and descriptive test case
-* if input doesn't really matter why not provide it in plain text for the sake of readability.
+* if with particular test input you expected specification to fail then its corner case and should
+  be handled in the dedicated and descriptive test case 
+* if the input doesn't really matter why not provide it in plain text for the sake of readability.
   If you really need random data why not [roll the dice](https://xkcd.com/221/) ;)
 * if tests will fail for some reason would you be able to reproduce input  which caused failure 
   or will it be expected 'X' but got 'Y' and that's all?
@@ -28,22 +28,22 @@ Random tests input is not good idea because:
 
 # The story
 
-To quickly bootstrap project we used random data generator to produce domain
-objects - I know it sounds bad. At first it looked promising and saved few key strokes, but it
-didn't took long to fail. The problem reveled itself when I introduced to initially stupid simple
-domain some business logic. We had few tests already in place but they were not depending on
-internal object state, but rather focusing on interactions. I created small subcontext for new
-feature in new package and once I started to integrate my code into existing domain testes
-started to fail randomly. I'm not sure what I expected. I asked for some randomness didn't I?
+To quickly bootstrap project we used random data generator to produce domain objects - I know it
+sounds bad. At first, it looked promising and saved few key strokes, but it didn't take long to
+fail. The problem revealed itself when I introduced to initially stupid simple domain some business
+logic. We had few tests already in place but they were not depending on internal object state, but
+rather focusing on interactions. I created a small subcontext for the new feature in the new package
+and once I started to integrate my code into existing domain tests started to fail randomly. I'm not
+sure what I expected. I asked for some randomness, didn't I?
 
 # The solution
 
-At first I wanted to exclude some fields from generation process and set values manually and then I
-realised that's no good because there are a lot of tests and with each one of them I will be forced
+At first, I wanted to exclude some fields from generation process and set values manually and then I
+realized that's no good because there are a lot of tests and with each one of them I will be forced
 to break encapsulation (which is dangerously easy in groovy...). Then I decided it is time to
 fallback to old good object factories. With object factories you are sure that initialized instances
-are valid business objects and with a bit of effort you'll be able to use the same code for tests
-objects creation, which is big plus.
+are valid business objects and with a bit of a effort you'll be able to use the same code for tests
+objects creation, which is a big plus.
 
 Consider flowing class (in our production application we had more fields to populate and state which
 revealed problem):
@@ -117,7 +117,7 @@ class ArticleFactory {
 }
 {{</highlight>}}
 
-Now when you have production objects factory you can reuse it's logic for test data creation:
+Now when you have production objects factory you can reuse its logic for test data creation:
 
 {{<highlight java>}}
 public class TestArticleFactory {
@@ -139,10 +139,10 @@ public class TestArticleFactory {
 }
 {{</highlight>}}
 
-And thats all. Note that from now on you can easily add additional logic to you test data factories
-to porpelly initialize objects and prepare them for testing phase. You'll need produce some extra
-code (comparing to raw groovy solution) but you are sure that objects created for your tests are the
-same objects you'll use in production application and in the longer run when domain changes all
-you'll need to do is fix factory to produce what is expected from it.
+And that's all. Note that from now on you can easily add additional logic to your test data
+factories to properly initialize objects and prepare them for the testing phase. You'll need to
+produce some extra code (comparing to a raw groovy solution) but you are sure that objects created
+for your tests are the same objects you'll use in the production application and in the long run
+when the domain changes all you'll need to do is fix factory to produce what is expected from it.
 
 <small>[samples](https://github.com/pchudzik/blog-example-random-test-input)</small>
