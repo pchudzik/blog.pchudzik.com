@@ -48,16 +48,16 @@ class SingleDynamicBeanProcessor implements BeanFactoryPostProcessor {
 }
 {{</highlight>}}
 
-You can define scope, add constructor arguments, inject other beans, and set name of the bean.
+You can define scope, add constructor arguments, inject other beans, and set the name of the bean.
 
-Note that DynamicBeanExample has constructor with two arguments. First one is string, second is
+Note that DynamicBeanExample has a constructor with two arguments. First one is string, second is
 TestDependency object. You can skip this kind of dependency and spring will automatically provide
 bean instance.
 
 # Creating multiple dynamically defined beans
 
 Creating single bean instance was easy. Creating multiple instances of the same bean is just putting
-bean creation in the loop ;) But let's complicate it a bit and use factory method instead:
+bean creation in the loop ;) But let's complicate it a bit and use a factory method instead:
 
 {{<highlight java>}}
 @Component
@@ -82,20 +82,20 @@ class DynamicBeanFactoryProcessor implements BeanFactoryPostProcessor {
 }
 {{</highlight>}}
 
-It works almost the same as constructor based initialization. You just pass arguments to factory
-method not constructor itself. This alone allows to do a lot of "interesting" things...
+It works almost the same as constructor based initialization. You just pass arguments to the factory
+method, not constructor itself. This alone allows to do a lot of "interesting" things...
 
 # My original issue
 
-Long story short I needed to create unknown number of beans based on some options defined in
-properties. It was more complicated and that's why I wasn't able to just provide external xml
-configuration and import it into my application context but let's keep it simple to show clear
-example on how to implement it.
+Long story short I needed to create an unknown number of beans based on some options defined in
+properties. It was more complicated and that's why I wasn't able to just provide external XML
+configuration and import it into my application context but let's keep it simple to show a clear
+example of how to implement it.
 
-Unfortunately you don't have access to spring magic from BeanFactoryPostProcessor - no properties,
+Unfortunately, you don't have access to spring magic from BeanFactoryPostProcessor - no properties,
 no environment, no beans. Only definitions of the objects that will be created by container later so
-you need to do some work by yourself but with below example I'm sure you will be able to do whatever
-you want.
+you need to do some work by yourself but with below example, I'm sure you will be able to do
+whatever you want.
 
 {{<highlight java>}}
 @Component
@@ -123,9 +123,10 @@ class ConfigurableBeanFactory implements BeanFactoryPostProcessor, InitializingB
 }
 {{</highlight>}}
 
-First of all we are loading properties file. Loading it from application.properties doesn't make a
-lot of sense but it is just an example. You can load this from file, system properties, environment
-variables or do whatever you want like load something (even class) from network resource etc.
+First of all, we are loading the properties file. Loading it from application.properties doesn't
+make a lot of sense but it is just an example. You can load this from a file, system properties,
+environment variables or do whatever you want like load something (even class) from network resource
+etc.
 
 For each loaded property create bean definition and you are good to go.
 
