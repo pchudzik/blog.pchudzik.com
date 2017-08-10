@@ -7,7 +7,7 @@ date: "2017-05-16"
 ---
 
 Working with a lot of data using plain JPA or hibernate or spring-data is possible, it does work and
-usually it doesn't require a lot of extra codding. Starting small is the fastest way of getting
+usually, it doesn't require a lot of extra coding. Starting small is the fastest way of getting
 things done but you must be aware of few things that might shoot you in the foot.
 
 <!--more-->
@@ -25,38 +25,38 @@ things done but you must be aware of few things that might shoot you in the foot
 # In general
 
 When working with big chunks of data it's important to control entity manager size and flush results
-to the database regularly. Remember that entity manager should be flushed  and then cleared. Flush
+to the database regularly. Remember that entity manager should be flushed and then cleared. Flush
 doesn't clear session cache! If you don't clear
 [entityManager](http://docs.oracle.com/javaee/7/api/javax/persistence/EntityManager.html) regularly
-each entity you save (and flush) stays in entityManager and consumes RAM. What's more it's not only
+each entity you save (and flush) stays in entity manager and consumes RAM. What's more, it's not only
 about memory usage because you can always buy more RAM. Hibernate dirty checking will have to verify
 all items in the session cache before flushing data to the DB. So first time it will check 100
-entities, next time it will check 200, next there will be 300 and it will grow unless cache is
+entities, next time it will check 200, next there will be 300 and it will grow unless the cache is
 evicted. Working with big data loads in JPA/hibernate forces you to control some things and it's
 your job to deallocate memory and think ahead.
 
 Another important thing is transaction management. In case of very long running tasks you might want
 to split single job across multiple transactions (for example one results page = one transaction).
-If job is not required to be executed in single transaction you should split it into the smallest
-possible units of work. There is nothing more annoying then transaction running for two hours and
-failing because someone updated minor detail, which updated version field in the DB, which, caused
-batch processing transaction to rollback... On one side of the coin it is good idea to keep
+If the job is not required to be executed in a single transaction you should split it into the smallest
+possible units of work. There is nothing more annoying than transaction running for two hours and
+failing because someone updated minor detail, which updated a version field in the DB, which, caused
+batch processing transaction to roll back... On one side of the coin it is a good idea to keep
 transaction as small as possible but on the other side executing a lot of small transactions might
-be slower then few bigger ones. It is your decision and you should select transactions size just
+be slower than few bigger ones. It is your decision and you should select transactions size just
 right for your application.
 
 The last thing is entities order. If your job is running for some time you should decide how to
 handle new records or updated ones. Ids which are usually sequentially ascending numbers might be
 good starting point for data sort (won't work with updates but it's a start). The general idea is to
-have deterministic way of fetching data and strategy on how to handle updates and new entities. Last
+have a deterministic way of fetching data and strategy on how to handle updates and new entities. Last
 time I was forced to do a bit of batch processing in plain JPA I've used simple last_updated_time
 which was already there and was perfect for the job. In more complex situations in which you must
-split your job across multiple transactions you might consider fetching list of all ids upfront.
+split your job across multiple transactions you might consider fetching list of all ids up front.
 
 Transaction management and cache size control are application specific but you should be aware of
 them since the beginning because not thinking about it now might cost you a lot of time in the
 future. Another thing worth pointing out is that you should always verify if your application works
-fine with production like data. Writing some tests running on in memory db is convenient but without
+fine with production like data. Writing some tests running on in memory DB is convenient but without
 load testing you will never be sure if you batch job will not fail after processing one million of
 entities.
 
@@ -66,7 +66,7 @@ spring-batch.
 
 # Example of data insert:
 
-Data insert is very simple just remember about clearing entity manager and be aware of transaction
+Data insert is very simple just remember about clearing entity manager and be aware of the transaction
 size which is ignored in this example ;) You can try and extract transactional methods which will
 actually insert portions of the data (which will be ugly because
 [@Transactional](https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/transaction/annotation/Transactional.html)
@@ -166,13 +166,13 @@ class JpaIterable implements Iterable<Product> {
 }
 {{</highlight>}}
 
-We can create stupid simple iterator which is responsible for fetching next page when we've fetched
-all data on current page. Above is not perfect implementation but will do for the simplest use
+We can create a stupid simple iterator which is responsible for fetching next page when we've fetched
+all data on the current page. Above is not a perfect implementation but will do for the simplest use
 cases.
 
-Note usage of iterator and iterable interfaces. Squeezing implementation details into standard is
-usually good idea. In this case you can replace fetch implementation without affecting processing
-logic. It is leaking because you need to remember about flush and clear, but it is still better then
+Note usage of iterator and iterable interfaces. Squeezing implementation details into the standard is
+usually a good idea. In this case, you can replace fetch implementation without affecting processing
+logic. It is leaking because you need to remember about flush and clear, but it is still better than
 exposing implementation to the outside. With java8 you should consider using stream, but you can
 convert iterator to a stream at any time using
 [StreamSupport](https://docs.oracle.com/javase/8/docs/api/java/util/stream/StreamSupport.html#stream-java.util.Spliterator-boolean-)
@@ -182,7 +182,7 @@ and
 
 ## Hibernate
 
-If you are using hibernate anyway and don't mind polluting your code with filthy implementation
+If you are using Hibernate anyway and don't mind polluting your code with filthy implementation
 details (;)) you can take advantage of
 [ScrollableResult](http://docs.jboss.org/hibernate/orm/5.2/javadocs/org/hibernate/ScrollableResults.html)
 which allows to do exactly the same we did in plain JPA.
@@ -251,10 +251,10 @@ Like in plain JPA example we still can squeeze and hide hibernate implementation
 interfaces (note that it is more complicated than plain JPA, but it is still worth considering when
 you decide to use
 [StatelessSession](http://docs.jboss.org/hibernate/orm/5.2/javadocs/org/hibernate/StatelessSession.html)).
-StatelessSession will detach any entity right after fetch (if it's what you want). It might come in
+StatelessSession will detach any entity right after a fetch (if it's what you want). It might come in
 handy when all you need to do is read data.
 
-When it comes to hibernate there are a lot configuration switches which will allow you to [control
+When it comes to hibernate there are a lot of configuration switches which will allow you to [control
 things](https://docs.jboss.org/hibernate/orm/5.2/userguide/html_single/Hibernate_User_Guide.html#batch).
 
 ## Spring-data
@@ -280,24 +280,24 @@ know what's going on under the hood.
 After loading data into hibernate's session cache it is important to invalidate it so used memory
 can be released. How to perform cache clean depends on the use case. When working with iterators you
 have more control and can free some memory once you are done with the particular part of the task.
-For example you can call em.clear() every 100 processed records or something like that, just
+For example, you can call em.clear() every 100 processed records or something like that, just
 remember that it might be tricky to keep iterator implementation independent from the processing
-logic. If processing logic starts to leak into iterator implementation or other way around you can
-fallback to Page or Slice (classes from the spring-data but you can do it on your own if you don't
-want to use spring). Working with the streams might be a bit easier (depending on problem) once you
-are done with one particular entity you can simply detach it from session cache and garbage
+logic. If processing logic starts to leak into iterator implementation or another way around you can
+fall back to Page or Slice (classes from the spring-data but you can do it on your own if you don't
+want to use spring). Working with the streams might be a bit easier (depending on the problem) once 
+you are done with one particular entity you can simply detach it from session cache and garbage
 collector will do the rest.
 
 # Data removal
 
 I prefer to use plain sql/jpql/hql/whatever with where condition which will handle removal of
 everything I want to remove. Two things that are important about data removal using sql. One is to
-ensure that any pending entity manager state should be flushed before executing update. Second is
-that you should clear session cache after updating statment (or just before it) because query was
-executed directly on database and session cache might be not aligned with DB state after removal
+ensure that any pending entity manager state should be flushed before executing the update. Second 
+is that you should clear session cache after updating statement (or just before it) because the query 
+was executed directly on database and session cache might be not aligned with DB state after removal
 operation.
 
 If plain sql is not possible because some additional business logic must be executed when deletion
-is performed then I'd approach in the same manner as update.
+is performed then I'd approach in the same manner as an update.
 
 <small>[samples](https://github.com/pchudzik/blog-example-jpa-batch)</small>
