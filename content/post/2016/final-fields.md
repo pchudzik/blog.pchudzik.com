@@ -7,16 +7,16 @@ date: "2016-12-03"
 ---
 
 Private final field modification is possible and it doesn't require a lot of work. Since you should
-not use this mechanism in real life there are cases when it is useful. For example how is hibernate
-using this to hydrate final entity fields.
+not use this mechanism in real life there are cases when it is useful. For example this how is
+Hibernate using this to hydrate final entity fields.
 
-But when using final fields with hibernate you should be extra careful how you declare them.
+But when using final fields with Hibernate you should be extra careful how you declare them.
 
 <!--more-->
 
 # How to change final field
 
-First things first. To change value of final field all you need to do:
+First things first. To change a value of final field all you need to do:
 
 {{<highlight java>}}
 Field finalField = Whatever.class.getDeclaredField("fieldName");
@@ -83,16 +83,17 @@ public class com.pchudzik.blog.immutable.ByteCodeTest {
 }
 {{</highlight>}}
 
-I've no idea how to read bytecod but using this [keywords
+I've no idea how to read bytecode but using this [keywords
 reference](https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings). We can try to figure
 out some things. First Take a look at getInlined method. It will load constant from constant pool
-and will return reference to it. Things looks different for Long object. First object reference will
-be loaded, then field will be read from object and finally it will be returned. See the diference?
-getInlined will not load object reference it will use variable directly from constant pool.
+and will return the reference to it. Things look different for the Long object. First object
+reference will be loaded, then the field will be read from the object and finally, it will be
+returned. See the difference? getInlined will not load object reference it will use the variable
+directly from constant pool.
 
-You might ask what's the difference between String and Long? Long is an object. 10L is not it's
+You might ask what's the difference between String and Long? Long is an object. 10L is not its
 primitive value and it must be converted to Long (Object). Autoboxing feature will kick in and will
-convert primitive 10L value to Long object that's why it is not compile time constant.
+convert the primitive 10L value to the Long object that's why it is not compile time constant.
 
 # Example
 
@@ -166,14 +167,14 @@ primitive long = 20
 
 So we can change values of final fields, but not really? No, the answer is inlining. (I can not use
 fields directly because "Can't touch this" will be inlined in println as well") But you can debug
-this and if you check value of the field it will be "Yes I can".
+this and if you check the value of the field it will be "Yes I can".
 
 But long object works. Getter displays value properly. It's because of primitives auto boxing
 feature. Note that value 10L is primitive so to make it work it must be boxed to Object Long since
 it's the type I want to use.
 
 Stepping on this mine is highly unlikely but nevertheless it's good to know and be aware of things
-that are happening inside jvm.
+that are happening inside JVM.
 
 <small>Source code of examples can be found on
 [github](https://github.com/pchudzik/blog-example-final-fields).</small>

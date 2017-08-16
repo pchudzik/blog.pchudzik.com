@@ -6,23 +6,20 @@ description: "Optimistic locking pitfalls"
 date: "2017-04-27"
 ---
 
-
 Optimistic locking is concurrency control method that allows to execute multiple transactions
 simultaneously as long as they don't interfere which each other. That's definition from
 [wikipedia](https://en.wikipedia.org/wiki/Optimistic_concurrency_control). You probably already know
-that [hibernate supports optimistic locking](
+that [Hibernate supports optimistic locking](
 http://docs.jboss.org/hibernate/orm/5.2/userguide/html_single/Hibernate_User_Guide.html#locking) and
 all you have to do in order to implement optimistic locking in you app is to add @Version on number
 or timestamp field and you are good to go. Right?
-
 
 <!--more-->
 
 # tl;dr
 
-When you care about data consistency and user experience you should take advantage of
-optimistic locking feature built in JPA and in order to do so sometimes you have to write some
-additional code.
+If you care about data consistency and user experience you should take advantage of optimistic
+locking feature built in JPA and in order to do so sometimes you have to write some additional code.
 
 # Intro
 
@@ -30,10 +27,10 @@ We will do classic [Alice and Bob](https://en.wikipedia.org/wiki/Alice_and_Bob) 
 
 ![Multiple users working with the same content](/images/content/201704/optimistic-locking.png)
 
-Bob starts writing post and when first version is ready he clicks save button. Alice notices new
-post and decides to fix paragraphs order. In the meantime Bob is still working on his post version
-fixing typos etc. What will happen when Bob decides to save his post version is not really
-important. Important is that it should not be accidental behavior but deliberate action.
+Bob starts writing a post and when the first version is ready he clicks save button. Alice notices
+new post and decides to fix paragraphs order. In the meantime, Bob is still working on his post
+version fixing typos etc. What will happen when Bob decides to save his post version is not really
+important. Important is that it should not be accidental behavior but a deliberate action.
 
 # Plain SQL
 
@@ -49,11 +46,11 @@ where
   id = 1
 {{</highlight>}}
 
-In the above example object can be updated anytime query is executed. It doesn't matter if post has
-changed five times already. Title and content will be updated. When Bob starts post edition in the
-morning and then decides to save it after lunch it will overwrite all changes made by Alice. This
-might not be expected behavior. Usually we want to make sure that users will not overwrite other
-people's work:
+In the above example an object can be updated anytime query is executed. It doesn't matter if the
+post has changed five times already. Title and content will be updated. When Bob starts post edition
+in the morning and then decides to save it after lunch it will overwrite all changes made by Alice.
+This might not be expected behavior. Usually we want to make sure that users will not overwrite
+other people's work:
 
 
 {{<highlight sql>}}
@@ -76,19 +73,19 @@ We rarely rely on plain SQL when writing java applications. Approach we often us
 to add number or timestamp field annotated with @Version and leave rest of the work to the JPA
 implementation.
  
-Think what's really going on. Your transactions is running for about 100 - 300ms and hibernate will
+Think what's really going on. Your transaction is running for about 100 - 300ms and Hibernate will
 keep updating version to make sure optimistic locking is in place every time transaction is
 committed. When your data is mostly read what are the chances that two users will click save button
-in the exact same moment (when we talk about production server then it will be next friday at
+at the exact same moment (when we talk about production server then it will be next Friday at
 5pm...)? When data gets back from the UI you probably just do entityManager.load(id) and then do
 some stuff with it. Data was on UI for some time, how to do you know it is up to date and if there
 was no modification in the meantime? If you are not using version field and don't send it to the
-client (there are other use cases and solutions but we are talking about simple forms not those
-fancy text editors designed for collaboration) you'll overwrite those changes. Point is: optimistic
-locking can't help you if you are not using it.
+client (there are other use cases and solutions but we are talking about simple forms, not those
+fancy text editors designed for collaboration) you'll overwrite those changes. The point is:
+optimistic locking can't help you if you are not using it.
 
 Let's write some code to see what's going on and why version must be used properly to work as
-expected. First take a look at the model:
+expected. First, take a look at the model:
 
 {{<highlight java>}}
 @Entity
@@ -214,9 +211,9 @@ def "optimistic locking failure without sending version to the client"() {
 }
 {{</highlight>}}
 
-In the above example hibernate has no idea what is going on and it can not help you with optimistic
-locking. We just tell it to load latest version from DB apply changes on it and persist it. Without
-proper version control Bob will overwrite all changes made by Alice.
+In the above example Hibernate has no idea what is going on and it can not help you with optimistic
+locking. We just tell it to load the latest version from DB apply changes on it and persist it.
+Without proper version control Bob will overwrite all changes made by Alice.
 
 To avoid this issue we can simply send version to the client:
 
@@ -231,6 +228,7 @@ public class PostDto {
 {{</highlight>}}
 
 And everything will work like in the first test case:
+
 {{<highlight groovy>}}
 def "working optimistic locking when sending version to the client"() {
   given: "Bob saves first post version"
@@ -283,13 +281,13 @@ private Post findPost(Long id, Long version) {
 {{</highlight>}}
 
 Fetching whole entity just to check version might not be the best idea, but it works for our
-example. In real world DB should do version checking for you (from Post where id = :id and version =
-:version) and it will be your job to handle situation when nothing is found.
+example. In real world, DB should do version checking for you (from Post where id = :id and version
+= :version) and it will be your job to handle the situation when nothing is found.
 
 
 # Summary
 
-Optimistic locking will not be magically handled by hibernate if it doesn't know what's going on.
+Optimistic locking will not be magically handled by Hibernate if it doesn't know what's going on.
 When it is required it is important to make sure that everything works as we want it to work and not
 by accident. Tracking versions is not always necessary (for example when you have _one_ admin user)
 but it is important to find out places where multiple users can work with the same object and make
