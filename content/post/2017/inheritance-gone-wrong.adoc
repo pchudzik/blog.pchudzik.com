@@ -1,0 +1,86 @@
+---
+title: "Inheritance gone wrong"
+Tags: ["java", "basics"]
+Categories: ["java"]
+description: "How to violate your stack"
+date: "2017-08-15"
+---
+
+We all know how inheritance works and implemented some kind of class hierarchy at least few times
+during our career. Some of us know already that inheritance is not the silver bullet. Some of us
+know that inheritance must not be overused and considered with caution. Now I'm going to show you
+how choosing the quick win might cost you some unexpected troubles in the future.
+
+<!--more-->
+
+I've been watching presentation https://www.youtube.com/watch?v=llGgO74uXMI[Core Design Principles
+for Software Developers by Venkat Subramaniam]. Venkat talked about great stuff (long one but worth
+watching) and one thing he mentioned struck me hard because I did something similar and didn't even
+notice what I really did :)
+
+First, let's take a look at the https://docs.oracle.com/javase/8/docs/api/java/util/Stack.html[Stack]
+java class, now after reading the Javadoc and ignoring the tip from the JDK developers let's see how
+we can make it bleed:
+
+{{<highlight java>}}
+@Test
+public void will_push_element_to_the_head_of_the_stack() {
+  //given
+  final Stack<String> stack = new Stack<String>();
+
+  //when
+  stack.push("a");
+  stack.push("b");
+
+  //then
+  assertEquals(
+    asList("a", "b"),
+    new ArrayList<String>(stack));
+
+  //when
+  stack.add(0, "y");
+
+  //then
+  assertEquals(
+    asList("y", "a", "b"),
+    new ArrayList<String>(stack));
+}
+{{</highlight>}}
+
+Wait what? Since when the stack is random access collection? Stack is First In First Out collection how
+can you set something as the end of the stack? The answer is in the Javadoc. `Stack<E> extends
+Vector<E>`. Vector is not as restrictive as stack and you can perform not stack like operations on it
+like, for example, add an element at any position.
+
+What can I do about it? Well the obvious solution is to read the
+https://docs.oracle.com/javase/8/docs/api/java/util/Stack.html[javadoc]:
+
+____
+A more complete and consistent set of LIFO stack operations is provided by the Deque interface and
+its implementations, which should be used in preference to this class
+____
+
+But seriously. Choose carefully what you are
+inheriting (like the property with an enormous mortgage which will eat all your savings) and remember
+that what is inherited will be available to the users.
+
+The obvious solution, in this case, will be: do not inherit from the vector. But the vector has all
+the functionality required by the stack. The answer is - delegate. Instead of extending vector and
+exposing all not stack like operation to the user hide your implementation inside and delegate what
+you need the _private_ vector in the Stack class. Now users can see only push and pop methods (and
+whatever you'll show them) and you can change how it's implemented any time you want.
+
+Delegating all the methods is boring stuff, There must be a better way to do it you might think.
+Sure there is as Venkat mentioned you can use IntelliJ IDEA which will do the hard work for you and
+will generate all the boring stuff.
+
+video::/images/content/201708/inheritance-gone-wrong/idea_refactor.mp4[width=640,options="autoplay,loop"]
+
+Another solution to the problem is to depend on the behavior, not on the implementation. If only
+stack was an interface then we will not be able to use add method which is defined in the Vector
+class (unless you'll do some other weird hacks like casting etc).
+
+The moral of the story is this: choose carefully what you extend and make sure that your class
+behavior is aligned with what you are extending and always remember that inheritance is complex
+stuff. There is yet another lesson. We all make mistakes and it's ok. Just remember to make them
+only once. Remember try not to violate your stack too much :)
