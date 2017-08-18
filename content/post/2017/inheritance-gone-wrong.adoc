@@ -74,7 +74,7 @@ Delegating all the methods is boring stuff, There must be a better way to do it 
 Sure there is as Venkat mentioned you can use IntelliJ IDEA which will do the hard work for you and
 will generate all the boring stuff.
 
-video::/images/content/201708/inheritance-gone-wrong/idea_refactor.mp4[width=640,options="autoplay,loop"]
+video::/images/content/201708/inheritance-gone-wrong/idea_refactor.mp4[width=100%,options="autoplay,loop"]
 
 Another solution to the problem is to depend on the behavior, not on the implementation. If only
 stack was an interface then we will not be able to use add method which is defined in the Vector
