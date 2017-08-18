@@ -6,44 +6,43 @@ description: "Example on how to configure test groups using junit @Category anno
 date: "2017-01-14"
 ---
 
-When project gets bigger and bigger there should be more and more tests. 
-In perfect world all tests should be executed really fast, but life is far 
-from perfect and sometimes some tests are slow.  When using gradle + spock 
-combination we have few ways on deciding how to group tests. 
-I'm going to explore junit @Category in combination with spock and gradle.
+When the project gets bigger and bigger there should be more and more tests. In the perfect world,
+all tests should be executed really fast, but life is far from perfect and sometimes some tests are
+slow.  When using Gradle + Spock combination we have few ways of deciding how to group tests. I'm
+going to explore junit @Category in combination with Spock and grade.
 
 <!--more-->
 
 # Why
 
-When project hits certain size there is a lot of tests. Usually some tests are faster than others.
+When project hits certain size there is a lot of tests. Usually, some tests are faster than others.
 For example database tests will be slower than domain tests. When developing small feature
-completely unrelated to database code we don’t really need to run db tests on our machine CI tool
+completely unrelated to database code we don’t really need to run DB tests on our machine CI tool
 will do it for us. So to improve development experience we can categorize tests into groups.
 
-When using gradle + spock combination it isn’t obvious how it should be configured. [Spock
+When using Gradle + Spock combination it isn’t obvious how it should be configured. [Spock
 documentation](http://spockframework.org/spock/docs/1.1-rc-3/index.html) has nothing on groups
-configuration. Gradle documentation doesn’t have much either. There is simple reason to it. Groups
-configuration depends on testing framework. It will be different for testNG and junit.
+configuration. Gradle documentation doesn’t have much either. There is a simple reason to it. Groups
+configuration depends on the testing framework. It will be different for TestNG and JUnit.
 
 # How
 
-Good news is that spock uses junit test runner to execute tests. There is nice feature in junit -
-[@Category](http://junit.org/junit4/javadoc/4.12/org/junit/experimental/categories/Categories.html)
+The good news is that Spock uses JUnit test runner to execute tests. There is nice feature in JUnit
+- [@Category](http://junit.org/junit4/javadoc/4.12/org/junit/experimental/categories/Categories.html)
 (it is experimental and it's [@Tag in
 junit5](http://junit.org/junit5/docs/current/user-guide/#migrating-from-junit4-tips)). Now all we
-need to do is [configure junit
-runner](https://docs.gradle.org/current/userguide/java_plugin.html#test_grouping) in gradle It’s all
-sounds good but full class names for categories configuration hardcoded in build.gradle is not
-really useful but with a bit of gradle magic we can do something nice with it.
+need to do is [configure JUnit
+runner](https://docs.gradle.org/current/userguide/java_plugin.html#test_grouping) in Gradle It’s all
+sounds good but full class names for categories configuration hard coded in build.gradle is not
+really useful but with a bit of Gradle magic we can do something nice with it.
 
 The idea is to create some marker interfaces - test categories. Then write helper class (maybe it
-should be plugin, but I’m not that good with gradle - see below) which will parse command line
+should be a plugin, but I’m not that good with Gradle - see below) which will parse command line
 parameters and decide which groups should be executed.
 
 # Offtopic
 
-Nice gradle feature I’ve discovered while preparing is [buildSrc
+Nice Gradle's feature I’ve discovered while preparing is [buildSrc
 directory](https://docs.gradle.org/current/userguide/organizing_build_logic.html#sec:build_sources).
 <blockquote>Gradle then automatically compiles and tests this code and puts it in the classpath of
 your build script. You don't need to provide any further instruction. This can be a good place to
@@ -230,6 +229,7 @@ com.pchudzik.blog.spock.database.IntegrationDbTest > integration test in databas
     running integration test from database package
 BUILD SUCCESSFUL
 {{</highlight>}}
+
 Awesome, all DB tests are skipped.
 
 What about something crazy:
@@ -253,13 +253,13 @@ work
 
 # Summary
 
-Using junit categories works exactly as expected ;). It's not yet perfect because it's impossible to
-run only uncategorized tests (which is actually really easy with spock RunnerConfiguration), but
-with a bit of effort it should be possible to exclude all groups and run only uncategorized tests.
+Using JUnit categories works exactly as expected ;). It's not yet perfect because it's impossible to
+run only uncategorized tests (which is actually really easy with Spock RunnerConfiguration), but
+with a bit of effort, it should be possible to exclude all groups and run only uncategorized tests.
 
-It’s worth mentioning that it’s not the only way of grouping spock tests in gradle. You can use
+It’s worth mentioning that it’s not the only way of grouping Spock tests in Gradle. You can use
 [RunnerConfiguration](http://spockframework.org/spock/javadoc/1.0/spock/config/RunnerConfiguration.html)
-to achieve exactly the same behaviour (not sure if --tests will work). Examples on how to use
+to achieve exactly the same behavior (not sure if --tests will work). Examples on how to use
 RunnerConfiguration for test grouping:
 http://wordpress.transentia.com.au/wordpress/2014/04/23/using-spock-configuration-in-grails/ <br/>
 http://mrhaki.rblogspot.com/2015/08/spocklight-including-or-excluding.html

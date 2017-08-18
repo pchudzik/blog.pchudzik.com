@@ -6,7 +6,6 @@ description: "How to create immutable dtos and deserialize them with jackson"
 date: "2017-04-15"
 ---
 
-
 Immutability and functional programming are hot right now. But how to achieve immutability with
 objects deserialized from json? Luckily there is pretty old feature introduced in [jackson
 2.7.0](https://github.com/FasterXML/jackson-databind/blob/master/release-notes/VERSION) which uses
@@ -16,7 +15,7 @@ constructor based object creation and uses
 
 <!--more-->
 
-With this approach you can easily deserialize immutable objects from json.
+With this approach you can easily deserialize immutable objects from JSON.
 
 {{<highlight java>}}
 import java.beans.ConstructorProperties;
@@ -36,11 +35,11 @@ public class PointVanillaJava {
 }
 {{</highlight>}}
 
-Now jackson will be able to create object instance using properly annotated constructor. It's all
-good but it is very verbose code. We can use lombok which has
+Now Jackson will be able to create object instance using properly annotated constructor. It's all
+good but it is very verbose code. We can use Lombok which has
 [@RequiredArgsConstructor](https://projectlombok.org/features/Constructor.html) and it adds
-@ConstructorProperties annotation to generated code automatically. With this in mind we can use
-lombok to generate boring stuff:
+@ConstructorProperties annotation to generated code automatically. With this in mind, we can use
+Lombok to generate boring stuff:
 
 {{<highlight java>}}
 import lombok.Getter;
@@ -74,8 +73,9 @@ def "should deserialize point #pointClass.simpleName from json"() {
 }
 {{</highlight>}}
 
-When I first saw when immutable entity with @RequiredArgsConstructor is properly deserialized from
-json I was really surprised and had one of those wtf moments "how it's working? how is it working?"
-Then I setup few brakpoints and finally figured out what's going on and how it's working :)
+When I first saw when an immutable entity with @RequiredArgsConstructor is properly deserialized
+from JSON I was really surprised and had one of those wtf moments "how it's working? how is it
+working?" Then I setup few breakpoints and finally figured out what's going on and how it's working
+:)
 
 [source code](https://github.com/pchudzik/blog-example-immutable-dto)

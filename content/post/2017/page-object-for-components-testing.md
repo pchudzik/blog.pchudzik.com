@@ -9,17 +9,17 @@ date: "2017-02-23"
 [Page object
 pattern](http://www.seleniumhq.org/docs/06_test_design_considerations.jsp#page-object-design-pattern)
 is common practice when writing automated tests using [selenium](http://www.seleniumhq.org/). It
-allows to gather all possible operations on page in one place and hide page implementation details
-from test case. Page object pattern can be used in the same way for angular directives, react and
-[put framework name here] components.
+allows to gather all possible operations on the page in one place and hide page implementation
+details from test case. Page object pattern can be used in the same way for angular directives,
+react and [put framework name here] components.
  
  <!--more-->
  
 We will be working with simple TODO app with directive responsible for displaying TODO item. I will
 focus on item modification which is part of item displaying 'logic'.
 
-The item edition will be triggered when button is clicked and saved. When other button is clicked
-modification will be reverted.
+The item edition will be triggered when the button is clicked and saved. When another button is
+clicked the modification will be reverted.
 
 We can start with something like this:
 
@@ -45,9 +45,9 @@ it('should edit item', () => {
 It works, right? Sure. When reading test code do you care about button class? What will happen with
 all 21 tests if button class will be changed from save to save-item?
 
-Let's refactor it to create more readable test.
+Let's refactor it to create a more readable test.
 
-After second test you should notice that directive creation can be reused.
+After the second test you should notice that directive creation can be reused.
 
 {{<highlight javascript>}}
 function createDirective(item) {
@@ -101,9 +101,9 @@ element.saveChangedItem();
 expect(item.text).toEqual('New value');
 {{</highlight>}}
 
-More complex operations can be gatherd in single function hidden inside createDirective function:
+More complex operations can be gathered in single function hidden inside createDirective function:
 
- {{<highlight javascript>}}
+{{<highlight javascript>}}
 function createDirective(item) {
   // initial directive creation code
   
@@ -161,12 +161,12 @@ const element = createDirective(item);
 expect(element.isHighlighted()).toEqual(true);    //element.isHighlighted = () => element.hasClass('important');
 {{</highlight>}}
 
-When reading test do you really care about the shade of red? Or if it is css class. It doesn't
+When reading test do you really care about the shade of red? Or if it is CSS class. It doesn't
 matter. The important thing is that item must be highlighted. How it's achieved will be eventfully
 checked but it's not critical information when reading test code.
 
 Using this approach it is easier to practice TDD. You can write your tests first and worry about
-implementation details letter when you decide what will be class name, or html layout.
+implementation details letter when you decide what will be a class name or HTML layout.
 
 Page object pattern can be very useful for testing angular directives and react components. With
 proper encapsulation all tests should be easier to maintain, refactor and read.
