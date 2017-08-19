@@ -6,7 +6,7 @@ description: "How to keep external dependencies up to date"
 date: "2017-03-30"
 ---
 
-Every codebase depends on multiple external libraries. It is good idea to stay up to date with
+Every codebase depends on multiple external libraries. It is a good idea to stay up to date with
 external dependencies. It is important to update all security related stuff and it might be helpful
 or fun to use latest features. I'm going to share my way of staying up to date with external
 dependencies in maven, gradle and npm.
@@ -16,27 +16,28 @@ dependencies in maven, gradle and npm.
 # CI 
 
 The first thing which in my opinion is crucial to stay up to date is to create automated checker.
-The best place for this will be your CI tool. Create jenkins plan (or whatever CI tool project)
-which will fail when there are outdated libraries. Automated tool will nudge you every time there is
-external library that should be updated. Without notification from the CI no one is going to execute
-dependency check manually in day to day development especially when there is more work then days
-before deadline.
+The best place for this will be your CI tool. Create Jenkins plan (or project in whatever CI tool
+you are using) which will fail when there are outdated libraries. Automated tool will nudge you
+every time there is an external library that should be updated. Without notification from the CI no
+one is going to execute dependency check manually on a day to day development especially when there
+is more work than days before the deadline.
 
 I don't recommend failing every time there is outdated library because it will be annoying to update
 frontend libraries every second hour ;) Failing when there is more than X outdated libraries is
-actually good idea. Just remember to configure X to be acceptable value. No one is going to update
-15 frontend libraries at once because 4 of them will have different API after bugfix release (...),
-but someone might update 2 or 3 of them once in a while.
+actually good idea. Just remember to configure X to be an acceptable value. No one is going to
+update 15 frontend libraries at once because 4 of them will have different API after bugfix release
+(...), but someone might update 2 or 3 of them once in a while.
 
-The last advice which is game changer is to configure it as commit hook not as scheduled task. When
-it is scheduled and it fails in the middle of the night then every developer will ignore. But when
-the build fails after your commit then you feel responsible for it and try to fix it to keep board
-green ([broken windows theory](https://en.wikipedia.org/wiki/Broken_windows_theory)).
+The last advice which is the game changer I've got is to configure it as commit hook not as
+scheduled task. When it is scheduled and it fails in the middle of the night then every developer
+will ignore. But when the build fails after your commit then you feel responsible for it and try to
+fix it to keep board green ([broken windows
+theory](https://en.wikipedia.org/wiki/Broken_windows_theory)).
 
 # npm
 
 When using npm as dependencies manager it is very simple to find out outdated packages - just run
-```npm outadted``` ([docs](https://docs.npmjs.com/cli/outdated)) and you are good to go. Sample
+```npm outdated``` ([docs](https://docs.npmjs.com/cli/outdated)) and you are good to go. Sample
 outdated command output
 
 {{<highlight text>}}
@@ -46,8 +47,7 @@ lodash        3.6.0   3.6.0  4.17.4  dependenices-update
 mocha         3.1.0   3.1.0   3.2.0  dependenices-update
 {{</highlight>}}
 
-When you CI
-instance is configured you might want to create something more 'sophisticated':
+When you CI instance is configured you might want to create something more 'sophisticated':
 
 {{<highlight bash>}}
 #!/bin/sh
@@ -65,8 +65,8 @@ if [ $OUTDATED_PACKAGES_COUNT -ge $MAX_OUTDATED_PACKAGES ]; then
 fi
 {{</highlight>}}
 
-You call this script with parameter which will be the maximum number of acceptable outdated
-dependencies. Script is very simple and will exclude most of beta and release candidates.
+You call this script with a parameter which will be the maximum number of acceptable outdated
+dependencies. The script is very simple and will exclude most of the beta and release candidates.
 
 [source](https://github.com/pchudzik/blog-example-dependencies/blob/master/npm/find-outdated-dependencies)
 
@@ -91,10 +91,11 @@ The following dependencies have later milestone versions:
  - org.springframework:spring-core [3.2.4.RELEASE -> 4.3.7.RELEASE]
 {{</highlight>}}
 
-Output is a bit complex, but luckily there are also other formats (json and xml) which can be
+The output is a bit complex, but luckily there are also other formats (JSON and XML) which can be
 generated using ```-DoutputFormatter=json``` switch. Output report will be generated in
-build/dependencyUpdates directory. Json support in bash doesn't exists, but you can use
-[jq](https://stedolan.github.io/jq/manual/) for working with json in bash (```sudo apt-get install jq```).
+build/dependencyUpdates directory. Jason support in bash doesn't exists, but you can use
+[jq](https://stedolan.github.io/jq/manual/) for working with json in bash (```sudo apt-get install
+jq```).
 
 Or you can ask google for some advice on how to use sed and improvise:
 
@@ -134,8 +135,8 @@ Add versions plugin to your plugins section:
 
 Now you can display outdated packages using ```mvn versions:display-dependency-updates```. If you
 want to run this check on CI tool then we need to analyze versions output. Luckily we don't have to
-analyze all the stuff that maven produces. We can pass additional property value and save report to
-file. Just run
+analyze all the stuff that maven produces. We can pass additional property value and save the report
+to file. Just run
 
 {{<highlight shell>}}
 mvn versions:display-dependency-updates -Dversions.outputFile=target/outdated.txt
@@ -152,7 +153,7 @@ The following dependencies in Dependencies have newer versions:
 The output file can be easily verified if there are outdated libraries.
 
 I like to use console for my day to day work, but I hate typing long commands so let's wrap it up
-into single reusable script which can be used on CI:
+into a single reusable script which can be used on CI:
 
 {{<highlight shell>}}
 #!/bin/sh
