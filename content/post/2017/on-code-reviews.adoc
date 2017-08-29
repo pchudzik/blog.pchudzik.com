@@ -1,0 +1,116 @@
+---
+title: "Code reviews"
+Tags: ["development"]
+Categories: ["best practices"]
+description: "Grumblings about code reviews"
+date: "2017-08-29"
+---
+
+Code review is a great process which gradually improves code quality. It is a system you can
+implement in many ways. In this post I'm going to grumble about one particular way of performing
+code reviews - when there is only one person responsible for doing code reviews and
+suggesting/accepting/rejecting changes.
+
+<!--more-->
+
+[.lead]
+tl;dr
+
+Why code review should be a team effort:
+
+* team feels responsible for the product
+* engages the whole team in the product creation process
+* more eyes see more things
+* share and revisit tribal knowledge easily
+* more people are able to learn new things and pick up good practices
+* leads to better design
+
+[.center-image]
+image::/post/2017/on-code-reviews/keys.jpeg[Ownership]
+
+[.lead]
+Product ownership
+
+Think how open source on GitHub works. There is usually one person (author) responsible for keeping
+the code right, and other people come and go. Do you want your organization to be built around the
+single person and do you want other people to come and go? Or maybe you are interested in building
+the team which you can trust to build a great product?
+
+[.lead]
+Human factor
+
+Do you always work on 100%? Can you operate at full capacity every day for the whole year? Will you
+be able to focus your full attention on the _[2 + insert number here]_ reviews per day for the whole
+year? If you said yes then I don't believe you. I actually like to do code reviews but I can do
+maybe like 3 small code reviews per day and I will do 2 in the morning and the last one after the
+lunch when my mind is fresh. There is still a chance that I will not find all the stuff that should
+be refactored. When the CR is big and I can not or don't want to split it then I'll do it for 3 days
+or more (yeah I've had few of those...) and that is because I want to fully understand the problem
+and do my best to make it better. The more people will read your code the better because what you've
+missed someone else might notice.
+
+[.center-image]
+image::/post/2017/on-code-reviews/books.jpeg[Books]
+
+[.lead]
+Knowledge transfer
+
+If your organization is built around one person who knows everything I hope you pay a lot of money
+to this person to keep him/her on board and you are paying huge insurance on behalf of this key
+person. Code review is the fastest way of letting the team know how the things work. I
+strongly believe that everyone should know a little about a lot. This way you can go on long
+vacation and don't be afraid to leave the phone in a hotel.
+
+[.small]
+If you have a really big team then engaging every single person from the group might not be the best
+idea, but 3 people should be just fine and it will help to spread the knowledge. Maybe instead of
+looking for savings you should think how you can split responsibilities to create smaller teams
+built of experts in the field?
+
+[.lead]
+Changing habits
+
+Habits are very powerful. Once you start doing something and you'll get good at it will be hard to
+convince you to do your thing differently. If you are the only person who can accept or reject the
+change what are the chances that you'll try something new and actually accept the change? You might
+not fully understand it or maybe you just don't like the way it looks? If you are not the only
+person making the decision then team members can suggest some things they'd like to try. Giving it a
+spin might make the code base better place and maybe you'll learn something new along the way. If
+not, well you've learned something anyway, right? Code review performed by meany peers will not only
+help you to change the habits but will also let you try or learn new things.
+
+[.center-image]
+image::/post/2017/on-code-reviews/create.jpeg[Create]
+
+[.lead]
+Better design
+
+What you can understand - the senior developer with a lot of experience might not be as easy to
+comprehend for the junior. You should always write the code like it will be read by the
+inexperienced developer. If the senior is the only person who reads the code and he is very smart
+then your code base might grow unnecessary complex because he can handle the idea. Maybe not
+everyone on the team feels comfortable with this complexity? How many times you've written some
+function or module to find out later that there is ready to use library which does exactly that? Or
+maybe you've implemented a complex feature which could've been done in completely different way with
+less effort and without tons of comments explaining every step along the way? Do you trust your
+designated leader to know every available library? Maybe someone on the team knows the one?
+
+[.lead]
+Summary
+
+I hope you get the idea already. Code review process should be organized around the team and for the
+team not just for the sake of being there. Multiple peers code review is better than code review
+done by the single person. *The more people you engage in the code review process the more people
+you engage in the product creation.* When doing multiple peers code reviews more people will be able
+to learn from the more experienced developers and maybe old dogs will learn one or two new tricks
+along the way?
+
+
+[.small]
+--
+Image credits:
+
+* https://www.pexels.com/photo/brass-ornate-vintage-key-on-black-computer-keyboard-39389/
+* https://www.pexels.com/photo/pile-of-books-in-shallow-focus-photography-264635/
+* https://www.pexels.com/photo/notebook-writing-pencil-start-45718/
+--
