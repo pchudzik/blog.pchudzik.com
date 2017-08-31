@@ -25,7 +25,7 @@ locking feature built in JPA and in order to do so sometimes you have to write s
 
 We will do classic [Alice and Bob](https://en.wikipedia.org/wiki/Alice_and_Bob) example:
 
-![Multiple users working with the same content](/images/content/201704/optimistic-locking.png)
+![Multiple users working with the same content](/post/2017/optimistic-locking/optimistic-locking.png)
 
 Bob starts writing a post and when the first version is ready he clicks save button. Alice notices
 new post and decides to fix paragraphs order. In the meantime, Bob is still working on his post

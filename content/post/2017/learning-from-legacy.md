@@ -15,7 +15,7 @@ You should take the opportunity to look into the past, and learn from it as much
 <!--more-->
 
 <center>
-![Commandos in the mud](/images/content/201706/learning-from-legacy/soliders-mud.jpg)
+![Commandos in the mud](/post/2017/learning-from-legacy/soliders-mud.jpg)
 </center>
 
 First of all, let's distinguish good and bad legacy code. Working with poorly designed code is
@@ -47,7 +47,7 @@ tested code will give you a head start because "trying to figure out this shit p
 done.
 
 <center>
-![Practice creative thining](/images/content/201706/learning-from-legacy/ideas.jpg)
+![Practice creative thining](/post/2017/learning-from-legacy/ideas.jpg)
 </center>
 
 On the other hand when the solution you've found doesn't work and it is troublesome, hard to
@@ -81,7 +81,7 @@ know on what you should focus your attention in the future. If tests are fragile
 what should be changed to make them stable.
 
 <center>
-![Creepy clown](/images/content/201706/learning-from-legacy/creepy-clown.jpg)
+![Creepy clown](/post/2017/learning-from-legacy/creepy-clown.jpg)
 </center>
 
 The last thing that will give you perspective is to try and compare old code with what you write

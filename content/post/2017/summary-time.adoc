@@ -25,7 +25,7 @@ all the technologies used in the project, figure out available APIs and was guid
 produce working solution.
 
 [.center-image]
-image::/images/content/201707/summary-time/words_worst_webiste.jpg[World worst webiste]
+image::/post/2017/summary-time/words_worst_webiste.jpg[World worst webiste]
 
 
 [.lead]
@@ -45,7 +45,7 @@ atmosphere and idea of good quality in mind. After first release (which went smo
 was on the horizon...
 
 [.center-image]
-image::/images/content/201707/summary-time/commute.jpeg[Commute]
+image::/post/2017/summary-time/commute.jpeg[Commute]
 
 
 [.lead]
@@ -85,7 +85,7 @@ took it to the next level and developed some extra tooling around it and now it 
 to be possible :)
 
 [.center-image]
-image::/images/content/201707/summary-time/broken.jpeg[Broken]
+image::/post/2017/summary-time/broken.jpeg[Broken]
 
 
 [.lead]
@@ -107,7 +107,7 @@ good. Refactoring sprints allowed the team to dig into the system and get a bit 
 with it.
 
 [.center-image]
-image::/images/content/201707/summary-time/hand.jpg[Thumb up]
+image::/post/2017/summary-time/hand.jpg[Thumb up]
 
 
 [.lead]
