@@ -2,6 +2,10 @@
 
 # it requires lftp to be installed and present on $PATH
 
+if [ -d public ]; then
+	rm -rf public
+fi
+
 hugo
 
 if [ -f credentials.sh ]; then
