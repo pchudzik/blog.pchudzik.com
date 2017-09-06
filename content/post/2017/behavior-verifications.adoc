@@ -1,0 +1,148 @@
+---
+title: "On behavior verifications"
+Tags: ["java", "springmock", "tdd", "testing"]
+Categories: ["best practices"]
+description: "Write your tests so you can trust them"
+date: "2017-09-06"
+---
+
+When I've got some free time I try to add new features to
+https://blog.pchudzik.com/201707/springmock-v1/[springmock]. Lately, after adding some new stuff I
+realized that double definition parsing class has more than one responsibility (class parsing,
+naming, definition creation, etc). So I've decided it's time to refactor it and split
+responsibilities into dedicated classes. Once I did that and tests in the shared kernel started to
+pass I executed mvn verify just to be sure that everything was working and it wasn't...
+
+<!--more-->
+
+[.lead]
+tl;dr
+
+- don't be afraid to break stuff in the process
+- make sure you've got tests that will work during and after the refactoring
+- implement few integration/smoke tests which will at least verify the happy path
+- refactor one thing at a time
+- if you can verify results in your test then _do_ verify the results
+- avoid behavior verification especially if what you are verifying are your objects
+
+[.lead]
+The story
+
+Since you are probably not familiar with what I'm trying to do let me explain it a little bit. Springmock
+allows to register mocks/spies in the spring context created by any mocking library (mockito, spock)
+into spring integration test cases. In order to create mock/spy I need to find doubles definitions
+and that's when parser comes into play. My parser implementation was responsible for:
+
+- finding all ```@AutowiredMock```/```@AutowiredSpy``` annotations on class and fields
+- extracting double details from an annotation
+- extracting double configuration from yet another annotation
+- creating a double definition based on those details
+- creating registry which contains all the definitions and is used later to register doubles in spring
+
+It was good enough in the beginning when all it was doing was finding annotated fields which was
+pretty straightforward. Now there is a bit more to it and there is even more on the way. I decided
+it is time to split it into more specialized classes. After reviewing existing tests for the module
+I felt pretty comfortable with the idea of refactoring the code. At the first glance there was
+nothing to change there, except maybe code responsible for the creation of object under test.
+
+[.lead]
+The fail
+
+Once I was done with the new class hierarchy I plugged it into existing parser (my first mistake was
+here, I should've plug one part at a time and making sure everything works one step a time). I've
+executed tests and of course there were failures which I've fixed pretty fast. Everything was green
+in the shared kernel module. Then I've executed spock and mockito tests and it was not so green
+anymore. About 90% of the tests have failed...
+
+I was able to locate the issue pretty fast:
+
+{{<highlight java>}}
+private DoubleDefinition createDoubleDefinition(AnnotationDetails details, Field field) {
+  final String doubleName = doubleNameResolver.resolveDoubleName(details, field.getName());
+  final Class<?> doubleClass = doubleClassResolver.resolveDoubleClass(details, field.getType());
+
+  final DoubleDefinitionBuilder definitionBuilder = DoubleDefinition.builder()
+    .name(doubleName)
+    .aliases(details.getAlias())
+    .doubleClass(doubleClass);
+
+  details
+    .resolveConfiguration(doubleConfigurationResolver)
+    .apply(doubleName, field);
+
+  return definitionBuilder.build();
+}
+{{</highlight>}}
+
+The bug is just before return statement I do create configuration object but I don't add this object
+to the ```DoubleDefinition``` and that's the problem. Nothing complicated.
+
+How should I approach the issue? My first idea was to write the test for ```createDoubleDefinition```
+but even without digging into the details I can see few problems with this approach.
+
+- it is a private method
+- it's not really public interface but more like an implementation detail
+- the public interface of this class is not so user-friendly (it accepts ```Class``` and ```Field``` as
+  input) so it's not as easy to test as you might think (both ```Class``` and Field are final classes)
+
+Completely ignoring warning signs I started to write some tests for this class and I've noticed two
+more issues. Creation of ```DoubleDefinitionFactory``` is a complicated process. This class has
+dependencies on other services and is basically responsible for coordinating the work not really
+doing it. In order to test it I'll need to create a full class hierarchy, then add some static
+classes with fields annotated with ```@AutowiredMock```/```AutowiredSpy``` and then pass those
+fields classes to the definition factory (```Class``` and ```Filed``` are final classes so mocking
+won't be easy). Alternatively, I can mock all of the external world. I was too lazy to do the first
+one. The second doesn't make a lot of sense to me.
+
+[.lead]
+The fix
+
+I removed what I've started to write and decided to look for the better place to test it. After a
+bit of digging I was surprised to find the test: ```should_parse_mock_configuration_from_field``` So
+I've thought about it maybe Maybe I'm not that stupid after all... I started reading it to figure
+out why it is not failing:
+
+{{<highlight java>}}
+@Test
+public void should_parse_mock_configuration_from_field() {
+  //given
+  final DoubleDefinitionTestConfiguration configurationAnnotation = findAnnotation(
+    findField(MockWithConfiguration.class, ANY_SERVICE_NAME),
+    DoubleDefinitionTestConfiguration.class);
+
+  //when
+  parseClass(MockWithConfiguration.class, configurationParser);
+
+  //then
+  Mockito
+    .verify(configurationParser)
+    .parseMockConfiguration(ANY_SERVICE_NAME, configurationAnnotation);
+}
+{{</highlight>}}
+
+See the verify call at the end? I'm an idiot after all :P why on earth would you verify interaction
+instead of checking out the result? Let's fix the test:
+
+{{<highlight java>}}
+//given
+final Object configuration = new Object();
+final DoubleDefinitionTestConfiguration configurationAnnotation = findAnnotation(
+  findField(MockWithConfiguration.class, ANY_SERVICE_NAME),
+  DoubleDefinitionTestConfiguration.class);
+Mockito
+  .when(configurationParser.parseMockConfiguration(ANY_SERVICE_NAME, configurationAnnotation))
+  .thenReturn(configuration);
+
+//when
+final DoubleRegistry doubleRegistry = parseClass(MockWithConfiguration.class, configurationParser);
+
+//then
+assertThat(
+  doubleRegistry.mocks(),
+  hasItem(doubleWithConfiguration(configuration)));
+{{</highlight>}}
+
+Finally it's failing as it should from the begging. The moral of the story is that you should avoid
+interaction verifications especially if you can simply check the result. Yet another moral of the
+story is the more powerful tools you have the more cautious you should be when using them because
+it's too easy to do stuff you normally wouldn't do.
