@@ -1,0 +1,166 @@
+---
+title: "Jumping ships"
+Tags: ["other"]
+Categories: ["other"]
+description: "Questions to your potential employer"
+date: "2017-09-19"
+---
+
+At some point in your career, you will not be happy with just a job, you'll be looking for something
+which will keep you interested and will sharpen your skills. Lately, I've been looking for something
+new to do. Since I got burned last time I've jumped ships I decided it is the time to prepare a list
+of the interview questions for my potential employer.
+
+<!--more-->
+
+[.center-image]
+image::/post/2017/jumping-ships/sign.jpg[Sign it]
+
+First of all please be warned that I don’t really have a lot of experience in looking for the job.
+Usually it was other way around. Everything I’m describing below are my experiences, ideas, and
+thoughts so if you decide to use anything from this post you are on your own ;)
+
+== Before the interview.
+
+Get to know a little about the company. Check out their glassdoor profile. Note that if a company is
+not strictly IT opinions might be written by people with different kind of the problems but look for
+the red flags like poor management, etc. Visit company's LinkedIn profile, there is a chance that
+you might know somebody who is working or worked there. Ask your colleagues about the company. You
+might be surprised how much you can learn about your potential employer during watercooler talk.
+Those first-hand experiences should be very strong points in your decision-making process.
+
+== During the interview
+
+First of all, you should be polite enough to let them know that you’ll need some time at the end to
+ask questions. Pay attention to what they are asking. If they ask you to solve the problem it might
+be the sign that they’ve faced it already. If they are asking about some technologies there is a
+chance they are using it, etc. But sometimes they'll ask questions just because they’ve found them
+somewhere on the internet. When you are suspicious ask why they are probing this particular topic
+and what it has to do with actual work they do in there. With a bit of luck you might be able to
+avoid this uncomfortable topic and steer discusion somewhere else ;)
+
+[.center-image]
+image::/post/2017/jumping-ships/jinn.jpg[Jinn]
+
+== The questions
+
+[.lead]
+What are the worst things you have to face in your day to day work which you can not change?
+Who can made the decision to change things around here?
+
+If they can name many of those things without thinking then something might not be right. Try to get
+as much information as possible. The purpose is to figure out the bad stuff that you’ll have to deal
+with. If they can not change it, you might not be able to change it (at least for some time). They
+might not be so eager to speak about the day to day issues to the stranger and will just mention it
+and quickly move on. Pay attention to what they are saying and ask about details if you think
+something is not right.
+
+[.lead]
+What are the things that irritate you and you can actually change? What have you done to change
+those things?
+
+A long list of issues without the process in progress nor plan to fix them should put you on your
+toes. It’s the sign that you should be extra cautious. If everything is peachy and there is
+nothing to fix it’s even more disturbing. There is always something to improve and when a person
+responsible enough to decide if you should be hired doesn’t know what should be fixed then something
+is not right.
+
+[.lead]
+If you could just say a magic word and change 3 things in the company what would you change? What
+should stay as it is?
+
+Alternative to the previous ones. Maybe they will be able to open a bit more during wishful thinking
+:)
+
+[.center-image]
+image::/post/2017/jumping-ships/boss.jpeg[The Boss]
+
+[.lead]
+Who’s calling the shots? How does decision process look like? With who can you discuss your doubts
+about the feature/bugfix and the system in general?
+
+If all the decisions are made overseas or on the moon then maybe they are looking for skilled
+typewriter who will carry out the will of the management? On the other hand, when details are
+discussed and planned with the team then maybe they are actually looking for someone with a broader
+skill set. Note that foreign management isn’t always bad it’s about figuring out how the process
+looks like and what to expect. It is important to know what you are getting yourself into and that
+you might be forced to write stupid code just to meet those requirements.
+
+[.center-image]
+image::/post/2017/jumping-ships/the-bug.jpg[The Bug]
+
+[.lead]
+How does bugfix process look like? From the moment it is found to the production deployment? How
+does urgent bugfix process look like? How often you release major bugs to the production?
+
+With a few additional questions you might figure out how well/bad the team is organized. Who is
+deciding what should be done, who is assigning the work? How real development process looks like.
+What about testing? Is there code review in place? Is there CI/CD configured? How is it deployed?
+This one might turn into a long conversation. If they have major bug on production every second day
+then they are either super agile or super lazy.
+
+[.lead]
+How do you test your application? What tools do you use? How many features/bugfixes have you written
+last week? How many tests have you written for that stuff?
+
+Unit tests? Integration tests? Load test? Manual tests? The more tests they have the less stressful
+the job will be. Do you use the test-first approach or do the tests at the end? What happens if any
+of the testing stages fails? Maybe all you’ll hear are some buzzwords without a real process behind?
+If they do produce the code but do not test it then consider yourself warned.
+
+[.lead]
+Why do you want to hire someone new? How many people stay on board for a bit longer?
+
+A big rotation of people is usually a bad sign and indicator of something deeply broken. If people
+come and go then there is probably something wrong and you’ll leave sooner than later. Try to
+clarify why they have so many dropouts.
+
+[.center-image]
+image::/post/2017/jumping-ships/learning.jpeg[Learning]
+
+[.lead]
+What books have you read recently? What interesting conferences you’ve attended to or watched?
+
+It is good to have inspiration. If they do not read and are not interested in what’s going on in the
+business then maybe they are there to do their job and nothing more. It’s hard to work with someone
+who just doesn't care.
+
+[.lead]
+What is the hardware you are working on? Do you think it is sufficient to do the work comfortably?
+
+16GB of ram, latest CPUs and fast SSD and they are still complaining about slow laptops? Then probably
+there is something wrong with the system. Ask how long does it take to setup the system on your local
+machine. How long does it take to start it? What additional tools you have to use during your day to
+day development?
+
+[.lead]
+What do you expect from me? What can I learn from you?
+
+Do they need typewriter that will do the job? Even if they do there might be things you’ll be able
+to learn along the way? It’s all about expectations - what you expect should match what they can
+offer, this should keep both parties happy (for some time at least ;))
+
+[.lead]
+What are the chances that I’ll actually work with you?
+
+There might be the chemistry during the interview but then when the day comes you’ll land in the
+suicide squad keeping the oldest system in the company from collapsing? Might not be as bad as it
+sounds but it’s all about the people and it is good to know in advance with who you’ll be working
+with.
+
+== The end
+
+I hope that you’ll find some of those questions useful. If you have your own set of sanity checks
+please share them :)
+
+[.small]
+--
+Image credits:
+
+* https://www.pexels.com/photo/sign-pen-business-document-48195/
+* https://commons.wikimedia.org/wiki/File:Illustration_of_Aladdin_Flying_Away_with_Two_People_from_the_Arabian_Nights.jpg
+* https://www.pexels.com/photo/tie-businessman-pullover-man-12628/
+* https://en.wikipedia.org/wiki/Software_bug#/media/File:H96566k.jpg
+* https://www.pexels.com/photo/auditorium-benches-chairs-class-207691/
+
+--
