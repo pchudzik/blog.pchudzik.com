@@ -1,0 +1,457 @@
+---
+title: "Events in spring v2"
+Tags: ["java", "spring", "basics", "howto"]
+Categories: ["java"]
+description: "Details about events in spring"
+date: "2017-09-29"
+---
+
+https://blog.pchudzik.com/201708/spring-events/[Last time] I wrote about events in a spring based
+application I've introduced some basics on how events can be dispatched using spring infrastructure.
+In this post, I'm going to dig deeper into an order of handlers, exceptions and asynchronous events
+handlers.
+
+<!--more-->
+
+== Order of handlers
+
+To execute event handlers in the order you need to make sure that your handlers are not
+asynchronous. If they are no one can really guarantee the order in which events will be processed.
+Once you are sure that you need to handle the event in particular order all you need to do is to
+annotate a
+https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/context/event/EventListener.html[@EventListener]
+method with an
+https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/annotation/Order.html[@Order]
+annotation.
+
+{{<highlight groovy>}}
+@SpringBootTest
+class HandlersOrderTest extends Specification {
+  @Autowired
+  ApplicationEventPublisher publisher
+
+  @AutowiredSpy
+  SecondHandler secondHandler
+
+  @AutowiredSpy
+  FirstHandler firstHandler
+
+  def "handlers should be invoked in order"() {
+    given:
+    final event = new AnyEvent()
+
+    when:
+    publisher.publishEvent(event)
+
+    then:
+    1 * firstHandler.handleEvent(event)
+
+    then:
+    1 * secondHandler.handleEvent(event)
+  }
+
+  @Configuration
+  private static class Config {
+  }
+
+  @Component
+  private static class FirstHandler {
+    @EventListener
+    @Order(1)
+    void handleEvent(AnyEvent event) {
+      println("First handler " + event)
+    }
+  }
+
+  @Component
+  private static class SecondHandler {
+    @EventListener
+    @Order(2)
+    void handleEvent(AnyEvent event) {
+      println("Second handler " + event)
+    }
+  }
+}
+{{</highlight>}}
+
+Note that each method must be annotated with an @Order annotation to work. Spring will create new
+bean for each handler method and therefore if methods are not annotated order is not guaranteed.
+
+If you need to handle events in order and think that @Order of handlers is tricky and might cause
+issues in the future there are other ways to do it. You can return yet another event from the
+handler itself which will be processed next.
+
+{{<highlight groovy>}}
+@SpringBootTest
+class EventFromHandlerTest extends Specification {
+  @AutowiredSpy
+  EventHandler eventHandler
+
+  @Autowired
+  ApplicationEventPublisher eventPublisher
+
+  def "should handle events in order"() {
+    given:
+    final event = new FirstEvent()
+
+    when:
+    eventPublisher.publishEvent(event)
+
+    then:
+    1 * eventHandler.handleFirstEvent(event)
+
+    then:
+    1 * eventHandler.handleAnotherEvent({ YetAnotherEvent anotherEvent ->
+      anotherEvent.originalEvent == event
+    })
+  }
+
+
+  @Configuration
+  private static class Config {
+  }
+
+  static class FirstEvent {
+  }
+
+  static class YetAnotherEvent {
+    private final FirstEvent originalEvent
+
+    YetAnotherEvent(FirstEvent originalEvent) {
+      this.originalEvent = originalEvent
+    }
+  }
+
+  @Service
+  private static class EventHandler {
+    @EventListener
+    YetAnotherEvent handleFirstEvent(FirstEvent event) {
+      println("First event " + event)
+      new YetAnotherEvent(event)
+    }
+
+    @EventListener
+    void handleAnotherEvent(YetAnotherEvent event) {
+      println("Another event " + event)
+    }
+  }
+}
+{{</highlight>}}
+
+If you need something even more complex handler can return a collection of events and each of events
+in the collection will be broadcasted separately.
+
+== Asynchronous event handlers
+
+Handling events can be time consuming. The first thing you might think of is to handle events
+asynchronously. The basic asynchronous usage might be achieved annotating handler methods with
+https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Async.html[@Async]
+
+{{<highlight groovy>}}
+@SpringBootTest
+class AsyncEventHandlerTest extends Specification {
+  @Autowired
+  ApplicationEventPublisher eventPublisher
+
+  @Autowired
+  CountDownLatch latch
+
+  def "should execute all asynchronous handlers"() {
+    given:
+    final event = new AnyEvent()
+
+    when:
+    eventPublisher.publishEvent(event)
+
+    then:
+    latch.await(2, TimeUnit.SECONDS)
+  }
+
+  @Configuration
+  @EnableAsync
+  private static class Config {
+    @Bean
+    CountDownLatch latch() {
+      new CountDownLatch(2)
+    }
+
+    @Bean
+    DoNothingHandler doNothingHandler() {
+      new DoNothingHandler(latch())
+    }
+
+    @Bean
+    AnotherDoNothingHandler anotherDoNothingHandler() {
+      new AnotherDoNothingHandler(latch())
+    }
+  }
+
+  @Slf4j
+  private static class DoNothingHandler {
+    private final CountDownLatch latch
+
+    DoNothingHandler(CountDownLatch latch) {
+      this.latch = latch
+    }
+
+    @Async
+    @EventListener
+    void handleEvent(AnyEvent event) {
+      log.info("Do nothing handler {}", event)
+      latch.countDown()
+    }
+  }
+
+  @Slf4j
+  private static class AnotherDoNothingHandler {
+    private final CountDownLatch latch
+
+    AnotherDoNothingHandler(CountDownLatch latch) {
+      this.latch = latch
+    }
+
+    @Async
+    @EventListener
+    void handleEvent(AnyEvent event) {
+      log.info("Another do nothing handler {}", event)
+      latch.countDown()
+    }
+  }
+}
+{{</highlight>}}
+
+Output:
+{{<highlight text>}}
+2017-09-24 12:01:29.439  INFO 6455 --- [cTaskExecutor-2] EventHandlerTest$AnotherDoNothingHandler : Another do nothing handler com.pchudzik.blog.example.springevents.more.AnyEvent@5e2a3259
+2017-09-24 12:01:29.439  INFO 6455 --- [cTaskExecutor-1] a.AsyncEventHandlerTest$DoNothingHandler : Do nothing handler com.pchudzik.blog.example.springevents.more.AnyEvent@5e2a3259
+{{</highlight>}}
+
+In case your default spring executor is not meant to handle application events you can create custom
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/event/ApplicationEventMulticaster.html[ApplicationEventMulticaster]
+with custom executor:
+
+{{<highlight groovy>}}
+@SpringBootTest
+class WithTaskExecutorEventHandlerTest extends Specification {
+  @Autowired
+  ApplicationEventPublisher eventPublisher
+
+  @AutowiredSpy
+  DoNothingHandler doNothingHandler
+
+  @AutowiredSpy
+  ExceptionThrowingHandler exceptionThrowingHandler
+
+  def "should execute all asynchronous handlers"() {
+    given:
+    final latch = new CountDownLatch(2)
+
+    when:
+    eventPublisher.publishEvent(latch)
+
+    then:
+    latch.await(2, TimeUnit.SECONDS)
+
+    then:
+    1 * exceptionThrowingHandler.handleEvent(latch)
+    1 * doNothingHandler.handleEvent(latch)
+  }
+
+  @Configuration
+  private static class Config {
+    private static final int FOUR_THREADS = 4
+
+    @Bean
+    ExceptionThrowingHandler exceptionThrowingHandler() {
+      new ExceptionThrowingHandler()
+    }
+
+    @Bean
+    DoNothingHandler doNothingHandler() {
+      new DoNothingHandler()
+    }
+
+    @Bean
+    ApplicationEventMulticaster applicationEventMulticaster() {
+      final multicaster = new SimpleApplicationEventMulticaster()
+      multicaster.setErrorHandler({ ex -> ex.printStackTrace()})
+      multicaster.setTaskExecutor(Executors.newFixedThreadPool(FOUR_THREADS))
+      return multicaster
+    }
+  }
+
+  @Slf4j
+  static class ExceptionThrowingHandler {
+    @EventListener
+    void handleEvent(CountDownLatch latch) {
+      log.info("Exception throwing handler " + latch.toString())
+      latch.countDown()
+      throw new Exception("Expected exception")
+    }
+  }
+
+  @Slf4j
+  static class DoNothingHandler {
+    @EventListener
+    void handleEvent(CountDownLatch latch) {
+      log.info("Do nothing handler " + latch.toString())
+      latch.countDown()
+    }
+  }
+}
+{{</highlight>}}
+
+Output:
+{{<highlight text>}}
+2017-09-24 12:07:01.263  INFO 6874 --- [pool-1-thread-3] ventHandlerTest$ExceptionThrowingHandler : Exception throwing handler java.util.concurrent.CountDownLatch@5658d7a9[Count = 2]
+2017-09-24 12:07:01.270  INFO 6874 --- [pool-1-thread-4] xecutorEventHandlerTest$DoNothingHandler : Do nothing handler java.util.concurrent.CountDownLatch@5658d7a9[Count = 1]
+{{</highlight>}}
+
+== Exceptions
+
+Last but not least. When something goes wrong exceptions are what you get. By default exception
+thrown from event handler will stop further event propagation:
+
+{{<highlight groovy>}}
+@SpringBootTest
+class EventExceptionTest extends Specification {
+  @AutowiredSpy
+  EventHandler eventHandler
+
+  @Autowired
+  ApplicationEventPublisher eventPublisher
+
+  def "Exception thrown from handler should break handlers chain"() {
+    given:
+    final anyEvent = new AnyEvent()
+
+    when:
+    try {
+      eventPublisher.publishEvent(anyEvent)
+    } catch (Exception ex) {
+      assert ex.getCause().getMessage() == "expected exception"
+    }
+
+    then:
+    0 * eventHandler.handleEvent(_)
+  }
+
+  @Configuration
+  private static class Config {
+    @Bean
+    ExceptionThrowingEventHandler exceptionThrowingEventHandler() {
+      new ExceptionThrowingEventHandler()
+    }
+
+    @Bean
+    EventHandler eventHandler() {
+      new EventHandler()
+    }
+  }
+
+  private static class ExceptionThrowingEventHandler {
+    @Order(1)
+    @EventListener
+    void handleEvent(AnyEvent anyEvent) throws Exception {
+      println("exception handler " + anyEvent)
+      throw new Exception("expected exception")
+    }
+  }
+
+  private static class EventHandler {
+    @Order(2)
+    @EventListener
+    void handleEvent(AnyEvent anyEvent) {
+      println("default handler " + anyEvent)
+    }
+  }
+}
+{{</highlight>}}
+
+Of course, it is possible to inject custom
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/util/ErrorHandler.html[ErrorHandler]
+into
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/event/ApplicationEventMulticaster.html[ApplicationEventMulticaster]
+which will be responsible for event handling.
+
+{{<highlight groovy>}}
+@SpringBootTest
+class EventExceptionHandlerTest extends Specification {
+  @AutowiredSpy
+  SimpleEventHandler defaultEventHandler
+
+  @Autowired
+  ApplicationEventPublisher eventPublisher
+
+  def "Exception thrown from handler should break handlers chain"() {
+    given:
+    final anyEvent = new AnyEvent()
+
+    when:
+    eventPublisher.publishEvent(anyEvent)
+
+    then:
+    1 * defaultEventHandler.handleEvent(_)
+  }
+
+  @Configuration
+  private static class Config {
+    @Bean
+    ApplicationEventMulticaster applicationEventMulticaster() {
+      final multicaster = new SimpleApplicationEventMulticaster()
+      multicaster.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER)
+      return multicaster
+    }
+  }
+
+  @Component
+  private static class ExceptionThrowingEventHandler {
+    @Order(1)
+    @EventListener
+    void handleEvent(AnyEvent anyEvent) throws Exception {
+      println("exception handler " + anyEvent)
+      throw new Exception("expected exception")
+    }
+  }
+
+  @Component
+  private static class SimpleEventHandler {
+    @Order(2)
+    @EventListener
+    void handleEvent(AnyEvent anyEvent) {
+      println("default handler " + anyEvent)
+    }
+  }
+}
+{{</highlight>}}
+
+Now at least you'll know what's going on with the errors and propagation will not be terminated too
+early. Which might cause unexpected troubles in case you've got multiple handlers registered for
+this particular event. Note that the same principles apply to web MVC even if you have
+https://docs.spring.io/spring/docs/current/javadoc-api/index.html?org/springframework/web/bind/annotation/ExceptionHandler.html[@ExceptionHandler]
+it is not Mulitcasters error handler, therefore, event propagation will be aborted.
+
+Yet again events handling in spring can save you some extra coding on your site but it's important
+to know a little bit more on how they do work before you jump head first into it. What I've
+presented here is only part of the things you should consider. There are also
+https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/event/TransactionalEventListener.html[@TransactionalEventListeners]
+which deserve an explanation on their own.
+
+[.small]
+--
+
+All code samples can be found on my
+https://github.com/pchudzik/blog-example-events-in-spring-v2[GitHub].
+
+http://docs.groovy-lang.org/latest/html/api/index.html?groovy/util/logging/Slf4j.html[@Slf4j] is
+groovy transform adding logback's log field to class
+
+https://github.com/pchudzik/springmock#spies[@AutowiredSpy] is
+https://blog.pchudzik.com/201707/springmock-v1/[springmock's] annotation which allows to create
+spock based spy and inject it into spock specification from spring context
+
+Everything else is standard spring and spring boot annotations.
+
+--
+
+
