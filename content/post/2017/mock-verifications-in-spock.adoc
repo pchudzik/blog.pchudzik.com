@@ -1,0 +1,117 @@
+---
+title: "Mock verifications in spock"
+Tags: ["gradle", "spock"]
+Categories: ["groovy"]
+description: "Mock verifications in spock"
+date: "2017-10-09"
+---
+
+
+I do like to write tests in http://spockframework.org/[Spock]. I'm not sure if I know every feature
+available but until lately I felt comfortable with my knowledge. Obviously, I should not. There is
+always something that can catch you off guard. The question is how long will it take to figure out
+what's happen.
+
+<!--more-->
+
+To the point. In Spock you can verify interactions in the ```then``` block.
+http://spockframework.org/spock/docs/1.1/interaction_based_testing.html#_mocking[Like]:
+
+{{<highlight groovy>}}
+def "should send messages to all subscribers"() {
+  when:
+  publisher.send("hello")
+
+  then:
+  1 * subscriber.receive("hello")
+  1 * subscriber2.receive("hello")
+}
+{{</highlight>}}
+
+So far so good nothing special in there. Magic starts when you need to achieve something more
+complicated.
+
+{{<highlight groovy>}}
+interface Notifier {
+  void notifyCompletion()
+}
+
+final executor = Executors.newFixedThreadPool(4)
+
+@Unroll
+def "no order failure"() {
+  given:
+  final notifier = Mock(Notifier)
+  final latch = new CountDownLatch(1)
+
+  when:
+  executor.execute({ ->
+    notifier.notifyCompletion()
+    latch.countDown()
+  })
+
+  then:
+  latch.await(2, TimeUnit.SECONDS)
+  1 * notifier.notifyCompletion()
+
+  where:
+  i << (1..10)
+}
+{{</highlight>}}
+
+It fails (almost always, it is asynchronous so I think I've seen maybe like one pass). Of course, my
+initial problem was much more complicated and it took me some time to figure out what is going on.
+Why it is failing you might ask? Well, it turns out it a feature :) If I'd read documentation
+thoughtfully I'd find very interesting
+http://spockframework.org/spock/docs/1.1/interaction_based_testing.html#_explicit_interaction_blocks[paragraph]
+about interactions blocks.
+
+____
+The answer is that under the hood, Spock moves interactions declared in a ```then:``` block to
+immediately before the preceding ```when:``` block. In most cases this works out just fine, but
+sometimes it can lead to problems.
+____
+
+How can it be fixed? My solution looks like this:
+
+{{<highlight java>}}
+@Unroll
+def "fixed order pass"() {
+  given:
+  final notifier = Mock(Notifier)
+  final latch = new CountDownLatch(1)
+
+  when:
+  executor.execute({ ->
+    notifier.notifyCompletion()
+    latch.countDown()
+  })
+
+  then:
+  latch.await(2, TimeUnit.SECONDS)
+
+  then:
+  1 * notifier.notifyCompletion()
+
+  where:
+  i << (1..10)
+}
+{{</highlight>}}
+
+The key is to have two ```then:``` blocks. First, one waiting for the latch second one checking the
+behavior. Alternatively waiting for the latch can be moved to the ```when:``` block.
+
+[.small]
+--
+Putting verifications in the  ```interaction {}``` block doesn't work because it is executed before
+the when block so latch will block before the thread is started.
+--
+
+I've been using Spock on daily basis for almost two years now and it still can surprise me with
+amount of magic that is happening under the hood ;)
+
+[.small]
+--
+Source of the tests can be found on my
+https://github.com/pchudzik/blog-example-spock-interactions-verifications[GitHub].
+--
