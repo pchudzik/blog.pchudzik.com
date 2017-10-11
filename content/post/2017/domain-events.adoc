@@ -1,0 +1,242 @@
+---
+title: "Poor's man domain events"
+Tags: ["java", "spring", "howto", "hibernate"]
+Categories: ["java"]
+description: "How to use @DomainEvents with jpa"
+date: "2017-10-16"
+draft: true
+---
+
+While investigating
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/event/EventListener.html[@EventListeners]
+in spring I've noticed very interesting annotation -
+https://docs.spring.io/spring-data/data-commons/docs/current/api/org/springframework/data/domain/DomainEvents.html[@DomainEvents].
+In this post I'm going to check what can be achieved using @DomainEvents annotation and how to
+effectively use it with old good JPA.
+
+Let's start with https://martinfowler.com/eaaDev/DomainEvent.html[short introduction] to domain
+event idea if you are not yet familiar with it. Now let's go back to the
+https://docs.spring.io/spring-data/data-commons/docs/current/api/org/springframework/data/domain/DomainEvents.html[@DomainEvents]
+annotation in spring-data. Spring-data by default provides support for this annotation and it's
+complementary annotation
+https://docs.spring.io/spring-data/data-commons/docs/current/api/org/springframework/data/domain/AfterDomainEventPublication.html[@AfterDomainEventPublication].
+The idea behind is very simple. In order to broadcast events from your aggregate root all you need
+to do is to annotate a method with @DomainEvents which will return events which happen to the entity
+since it was loaded from the persistent store. Spring will register
+https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/repository/core/support/EventPublishingRepositoryProxyPostProcessor.html[EventPublishingRepositoryProxyPostProcessor]
+which will detect those methods and execute them. Finally, it will pass the results to
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/ApplicationEventPublisher.html[ApplicationEventPublished#publish].
+
+The idea behind is pretty simple. And can be implemented in few lines of code. What's more you can
+take advantage of AbstractAggregateRoot class already present in spring:
+
+{{<highlight java>}}
+public class AbstractAggregateRoot {
+  private transient final @Transient List<Object> domainEvents = new ArrayList<Object>();
+
+  protected <T> T registerEvent(T event) {
+
+    Assert.notNull(event, "Domain event must not be null!");
+
+    this.domainEvents.add(event);
+    return event;
+  }
+
+  @AfterDomainEventPublication
+  protected void clearDomainEvents() {
+    this.domainEvents.clear();
+  }
+
+  @DomainEvents
+  protected Collection<Object> domainEvents() {
+    return Collections.unmodifiableList(domainEvents);
+  }
+
+  @JsonIgnore
+  @Deprecated
+  public List<Object> getDomainEvents() {
+    return (List<Object>) domainEvents();
+  }
+}
+{{</highlight>}}
+
+[.small]
+--
+https://github.com/spring-projects/spring-data-commons/blob/master/src/main/java/org/springframework/data/domain/AbstractAggregateRoot.java[source]
+--
+
+The drawback is that it introduces yet another state to your object and/or complicate objects
+hierarchy, but it might be worth it.
+
+Now everything is great unless you are using JPA. With  JPA it is common to use Unit of Work pattern
+and because of implementation of the invoke method of
+https://github.com/spring-projects/spring-data-commons/blob/master/src/main/java/org/springframework/data/repository/core/support/EventPublishingRepositoryProxyPostProcessor.java#L97[EventPublishingRepositoryProxyPostProcessor.EventPublishingMethodInterceptor]
+entity events will be broadcasted only when you call the save method which you usually don't. Most
+of the times entity already exists in the DB, then it is loaded and it resides in the hibernate
+session so there is no need to save entity by hand. It will be handled by the AOP and the dirty
+checking magic.
+
+So what can we do to take advantage of @DomainEvents in JPA? The most obvious (sometimes the safest
+and good enough) way will be to implement aspect which will get executed around all @Transactional
+methods. The problem with the aspect is that it knows nothing about transaction template...
+
+In order to make it work we need to go deeper and implement Hibernate interceptor which will handle
+domain events propagation. First let's handle @DomainEvents broadcast since we'll not be able to use
+current spring implementation 1:1.
+
+If you are too busy to read all the code the responsibility of below class it to find methods
+annotated with @DomainEvents and @AfterDomainEventPublication and execute them on the entity. Check
+out
+https://github.com/pchudzik/blog-example-spring-domain-events/blob/master/src/test/groovy/com/pchudzik/blog/example/domainevents/DomainEventsHolderTest.groovy[the
+tests] to see it in action and how can it be used.
+
+{{<highlight java>}}
+@RequiredArgsConstructor
+class DomainEventsHolder {
+  private static final boolean UNIQUE_ANNOTATION = true;
+
+  private final ApplicationEventPublisher eventPublisher;
+  private final Object entity;
+
+  public void publishAndClearEvents() {
+    getEvents().forEach(eventPublisher::publishEvent);
+    clearEvents();
+  }
+
+  private Collection<Object> getEvents() {
+    return domainEventsMethod()
+        .map(method -> (Collection<Object>) ReflectionUtils.invokeMethod(method, entity))
+        .orElse(emptyList());
+  }
+
+  private void clearEvents() {
+    final AnnotationDetectionMethodCallback<AfterDomainEventPublication> methodCallback = new AnnotationDetectionMethodCallback<>(
+        AfterDomainEventPublication.class,
+        UNIQUE_ANNOTATION);
+    ReflectionUtils.doWithMethods(entity.getClass(), methodCallback);
+    final Method method = methodCallback.getMethod();
+
+    if (method != null) {
+      ReflectionUtils.makeAccessible(method);
+
+      ReflectionUtils.invokeMethod(method, entity);
+    }
+  }
+
+  public boolean hasDomainEvents() {
+    return domainEventsMethod().isPresent();
+  }
+
+  private Optional<Method> domainEventsMethod() {
+    final AnnotationDetectionMethodCallback<DomainEvents> methodCallback = new AnnotationDetectionMethodCallback<>(
+        DomainEvents.class,
+        UNIQUE_ANNOTATION);
+    ReflectionUtils.doWithMethods(entity.getClass(), methodCallback);
+    return Optional
+        .ofNullable(methodCallback.getMethod())
+        .map(method -> {
+          ReflectionUtils.makeAccessible(method);
+          return method;
+        });
+  }
+}
+{{</highlight>}}
+
+Now all we need to do is to implement interceptor:
+
+{{<highlight java>}}
+@Slf4j
+@RequiredArgsConstructor
+@Component
+class HibernateInterceptor extends EmptyInterceptor {
+  private static final boolean NOT_PARALLEL = false;
+
+  private final ApplicationEventPublisher eventPublisher;
+
+  @Override
+  public void postFlush(Iterator entities) {
+    final Stream<Object> entitiesStream = StreamSupport.stream(
+        Spliterators.spliteratorUnknownSize(entities, Spliterator.ORDERED),
+        NOT_PARALLEL);
+
+    entitiesStream
+        .map(this::createEventHolder)
+        .filter(DomainEventsHolder::hasDomainEvents)
+        .forEach(DomainEventsHolder::publishAndClearEvents);
+  }
+
+  private DomainEventsHolder createEventHolder(Object entity) {
+    return new DomainEventsHolder(eventPublisher, entity);
+  }
+}
+{{</highlight>}}
+
+And finally register hibernate's interceptor in the spring context:
+
+{{<highlight java>}}
+class HibernateConfiguration extends HibernateJpaAutoConfiguration {
+  @Autowired
+  private HibernateInterceptor hibernateInterceptor;
+
+  public HibernateConfiguration(DataSource dataSource, JpaProperties jpaProperties, ObjectProvider<JtaTransactionManager> jtaTransactionManager, ObjectProvider<TransactionManagerCustomizers> transactionManagerCustomizers) {
+    super(dataSource, jpaProperties, jtaTransactionManager, transactionManagerCustomizers);
+  }
+
+  @Override
+  protected void customizeVendorProperties(Map<String, Object> vendorProperties) {
+    super.customizeVendorProperties(vendorProperties);
+    vendorProperties.put("hibernate.ejb.interceptor", hibernateInterceptor);
+  }
+}
+{{</highlight>}}
+
+
+To prove the point we can implement simple main method which will log some stuff:
+{{<highlight java>}}
+
+@Component
+class DescriptionChangListener {
+  @EventListener
+  public void onDescriptionChange(DescriptionUpdated event) {
+    log.info("Description of {}, modified from {}, to {}",
+        event.getEntityId(),
+        event.getOldDescription(),
+        event.getNewDescription());
+  }
+}
+
+public static void main(String[] args) {
+  final ConfigurableApplicationContext ctx = SpringApplication.run(DomainEventsApplication.class, args);
+
+  final TransactionalService transactionalService = ctx.getBean(TransactionalService.class);
+  final TxTemplateService txTemplateService = ctx.getBean(TxTemplateService.class);
+  final EntityPersister entityPersister = ctx.getBean(EntityPersister.class);
+
+  final Long entityId = entityPersister.save(new AnyEntity("initial description")).getId();
+  log.info("Entity {}", entityPersister.load(entityId));
+
+  transactionalService.updateEntity(entityId, "transactional description");
+  log.info("Entity {}", entityPersister.load(entityId));
+
+  txTemplateService.updateDescription(entityId, "tx template description");
+  log.info("Entity {}", entityPersister.load(entityId));
+}
+{{</highlight>}}
+
+When implementing your own solution carefully consider when to handle @DomainEvents, there are other
+phases you might want to hookup up to. Also be aware that this way some of the events might get lost
+if one of the operations on the aggregate root fails. using this as a working mule of the event
+sourcing system might not be the best idea :)
+
+[.small]
+--
+
+source code can be found on https://github.com/pchudzik/blog-example-spring-domain-events[my github]
+
+https://projectlombok.org/features/constructor[@RequiredArgsConstructor] and
+https://projectlombok.org/features/log[@Slf4j] are from
+https://projectlombok.org/features/all[Project Lombok].
+
+Everything else is plain java and spring.
+
+--
