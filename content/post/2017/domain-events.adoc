@@ -7,7 +7,8 @@ date: "2017-10-16"
 draft: true
 ---
 
-While investigating
+https://blog.pchudzik.com/201708/spring-events/[While]
+https://blog.pchudzik.com/201709/spring-events-more/[investigating]
 https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/event/EventListener.html[@EventListeners]
 in spring I've noticed very interesting annotation -
 https://docs.spring.io/spring-data/data-commons/docs/current/api/org/springframework/data/domain/DomainEvents.html[@DomainEvents].
@@ -27,8 +28,8 @@ https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/
 which will detect those methods and execute them. Finally, it will pass the results to
 https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/ApplicationEventPublisher.html[ApplicationEventPublished#publish].
 
-The idea behind is pretty simple. And can be implemented in few lines of code. What's more you can
-take advantage of AbstractAggregateRoot class already present in spring:
+Basic implementation can be done in few lines of code. What's more, you can take advantage of
+AbstractAggregateRoot class already present in spring:
 
 {{<highlight java>}}
 public class AbstractAggregateRoot {
