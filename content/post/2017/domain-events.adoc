@@ -4,7 +4,6 @@ Tags: ["java", "spring", "howto", "hibernate"]
 Categories: ["java"]
 description: "How to use @DomainEvents with jpa"
 date: "2017-10-16"
-draft: true
 ---
 
 https://blog.pchudzik.com/201708/spring-events/[While]
