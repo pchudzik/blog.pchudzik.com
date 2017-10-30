@@ -1,0 +1,257 @@
+---
+title: "Database migrations"
+Tags: ["java", "flyway", "howto"]
+Categories: ["java"]
+description: "Best practices for database evolution"
+date: "2017-10-31"
+---
+
+Most of the application we are working on are built around the data. Since the information is the
+core value of the application we store it in the persistent and reliable storage - database.
+Applications evolve in time so does the way we store the data. In this post, I'm going to present my
+experiences and thoughts on evolving database schema.
+
+<!--more-->
+
+Note that I'm Java guy so I like relational databases and https://flywaydb.org/[Flyway] ;) But most of those practices are
+universal, only solutions might differ. Flyway is a really simple library but as a usual devil is in
+the details. I've been using it for a few years now and noticed few things that do work and some of
+them which do not.
+
+== tl;dr
+
+- Start small. When starting development of new project you might not necessarily need DB migration
+tool. Start with Hibernate's drop/create schema. Later switch to validate and add flyway migrations
+- Never ever do any manual DDL operation on the database. Do not update any data typing SQL by hand.
+Database is read-only for developers
+- Avoid out of order migrations
+- Write your migrations to be as portable as possible. Avoid using advanced DB features like PLSQL
+etc
+- Treat all the databases you use as equals
+- Create sample data to be imported when starting up application on localhost
+- Test database integration
+- Develop custom migration tool for exotic storage
+
+== Do not use flyway from the beginning (in new projects)
+
+[.center-image]
+image::/post/2017/database-migrations/new.jpeg[Brand new]
+
+When you are starting development of the brand new system based on the new database you don't need
+to write all the SQL by hand. In the initial phase of the project when you are getting familiar with
+the domain and incrementally develop and redesign/refactor your domain configure hibernate to update
+(or even drop & create) the schema it will do in the initial phase and allow you to deliver core
+features faster. Once you think schema is stable enough configure Hibernate to print creation script
+and voila here is your first database version ;) Remember that this schema was created by stupid
+machine so read it carefully and tweak it to be sure that generated SQL is exactly what you want.
+
+Once you are out of the initial development phase and you have at least one migration executed by
+Flyway now it is the time to change Hibernate settings. Configure it to validate the schema every
+time it starts. This way you'll be the first one to know when something is not right. The fail fast
+strategy is a feature. Sooner you will know about the problem the smaller is the chance of finding
+it on the production... When you support multiple databases it is ok to set it to ```none``` on
+non-production database type. For example, h2 and Oracle don't go along so well...
+
+== Do not execute any ddl/data update operations on db by hand
+
+[.center-image]
+image::/post/2017/database-migrations/stop.jpeg[Stop and think!]
+
+If you have https://flywaydb.org/[Flyway] or http://www.liquibase.org/[Liquibase] then stick with
+it. Let it do its job and don't mess up the DB when you forget to put where restrictions in
+update/delete statement... The problem with manually modified schema is that at some point your
+production/integration/testing database doesn't look like the others. It will be fine in the
+beginning but after some time migration #123 will fail on production DB because around migration #11
+you've fixed something manually on the testing environment and as a result migration #123 passed all
+stages but production. There are so many things that might go south that it is much safer and
+simpler if they go the same way on all environments...
+
+You made a mistake and it is already deployed? Add yet another migration script that fixes the
+previous mistake and you are good to go. If you messed up really bad drop the database, import dump
+from the production DB and re-run your migration but do not fix it manually. Database schema
+evolution must be an automated process working without any human interaction. Unles you want to
+supervise every release and keep your fingers crossed for the migrations to work...
+
+== Avoid using out of order migrations
+
+[.center-image]
+image::/post/2017/database-migrations/order.jpg[Keep things in order]
+
+There might a place for out of order migrations in the complex system with multiple developers
+working simultaneously using single database (but in this situation out of order migrations are
+probably the smallest of your problems...). Seriously when an application is stable how often do you
+need to change the schema?
+
+As a rule of thumb, you should stay away from this feature unless you want to mess up your
+production/testing database. Disabling out of order migrations is really simple and actually, all
+you have to do is to leave Flyway with its
+https://flywaydb.org/documentation/commandline/migrate[default configuration] because it is off
+unless you change it. If you decide to enable this feature remember that this can be enabled only on
+localhost and maybe one of dev environments. You should never allow to execute out of order
+migrations on production DB.
+
+== Don't use plsql/tsql/whatever to write your migrations
+
+[.center-image]
+image::/post/2017/database-migrations/language.jpg[Stick with general purpose solutions]
+
+You can write any migration you might need using PLSQL or other Transact-SQL but you should not do
+it unless Oracle or SQL Server are the only databases you are using. Also you should remember that
+is is easier for new developers to understand JDBC than to learn dialect of the DB you decided to
+use.
+
+Avoid DB dedicated dialects because using it might be impossible/very hard to have shared migration
+scripts. Instead of the PLSQL/TSQL, you can write your migrations in the plain JDBC. It will work on
+SQL Server, Oracle and h2 and you will have only one script responsible for migration. It shouldn't
+take much longer to migrate your DB using PLSQL or JDBC. Just remember about a volume of the data
+and in case of complicated migrations on big database use pagination, cursors or something to avoid
+unexpected out of memory exceptions.
+
+Once you are committed to use JDBC for migrations you must not use any of your production code in
+the migrations. You might be tempted to use DTO or JPA entity in the migration which fits perfectly
+to store some data required for the job. Every constant thing in the software development is the
+change and after some time your DTO will change. Once DTO is modified you'll be forced to change the
+migration.... To avoid those issues java based migrations should be self-contained and separated
+from your code base.
+
+== Create single evolution path
+
+[.center-image]
+image::/post/2017/database-migrations/crossroads.jpg[Keep straight evolution path]
+
+Your migrations should support all the databases you have. If you run your application on h2 locally
+and on Oracle or MariaDB or whatever on the production then you should keep your migration history
+as straight as possible. One might be tempted to just make life "simpler" and create separate
+history for Oracle and h2. Going down this road you'll most probably drop h2 support because after
+migration #42 both of your schemas will be completely different and it will make no sense to test
+your application against non-production like schema or your tests will be the worst kind - false
+positive.
+
+To keep support of two databases and keep the evolution path as straight as possible we can create
+directory structure something like this:
+
+{{<highlight text>}}
+.
+├── core
+│   └── V1__create_schema.sql
+├── h2
+│   └── V1.1__create_index.sql
+├── oracle
+│   └── V1.1__create_index.sql
+└── sample-data
+    └── V2__sample_data.sql
+{{</highlight>}}
+
+Directories layout is up to you but the thing to keep in mind is to keep as much of the migrations
+in the shared scripts as possible. Once you have this configured you can easily switch directories
+from which migrations should be applied. In spring you can create two profiles. ```test``` which
+will load core + h2 and ```oracle-test``` which will load core+oracle. Flyway is smart enough to
+create sequential migration path which is spread across multiple folders.
+
+== Support all the databases you want to use
+
+[.center-image]
+image::/post/2017/database-migrations/equal.jpg[All databases should be treated the same]
+
+If for some reason you decide to use DB feature which is not supported by other DB you should do
+your best to "simulate" the behavior in the other DB. It does not have to work like in the original
+DB. You should not implement full-text search in h2. Simple implementation based on contains
+function will do for local development purposes :) Writing those hacks in h2 is easy. Note that
+performance will probably suck but do you really care about some extra milliseconds when running on
+in memory DB with few records in it?
+
+In case of a really complicated feature that for some reason is impossible to implement in one of
+the databases, you should take advantage of the polymorphism. Now it is the time to create an
+interface and provide two different implementations. With spring you can easily switch them using
+profiles. In case of testing those features based on functionality not available in other databases,
+you can create tests group dedicated to a particular database.
+
+== Test/sample data
+
+[.center-image]
+image::/post/2017/database-migrations/sample.jpeg[Sample data]
+
+Why would you need test data? With application starting up with some sample data you avoid
+installing Oracle on your local machine, dumping production DB, loading it on your local machine,
+keeping the data up to date after you've messed it up, importing it again, etc. Now it is relatively
+easy with docker or vagrant, but still those are the steps that are usually executed manually and
+repeated once in a while after you corrupt imported data.
+
+Instead, feed your application with some initial data. It shouldn't be a lot. Few rows will do and
+will allow to verify basic stuff. You'll no longer need a laptop with 32gb of ram because now your
+application will run using just 2gb rest will be consumed by chrome anyway ;) How can you load test
+data on your local machine but not on production or UAT? The same way you support multiple
+databases. Put the test data in the dedicated folder and load it only when running on localhost.
+
+== Testing
+
+[.center-image]
+image::/post/2017/database-migrations/test.jpeg[Testing]
+
+Testing is an important part of the process. Always run automatic tests on all the databases you
+support. Make sure that your tests are executed on DB that all the developers are using and the DB
+which is running on the production.
+
+If your application is data centered (most of them?) then you must make sure that integration with
+the data store works just fine. There should be no doubt that feature you implemented might fail on
+production because there is a different column name, type or whatever. Since in java world we
+usually use a lot of magic to stay as far from the SQL as possible we must be sure that everything
+works just fine.
+
+Write tests for the repositories. Most of them can be executed in a single transaction which will be
+rolled back after the test. In rare cases that require the commit make sure that you clean up after
+yourself and that you do not leave any data for the other tests do discover and fail. This kind of
+the issue is really hard to track down especially when your tests are executed without any specific
+order and it might work on your local machine but will fail on Jenkins. More about testing java
+repositories can be found in one of my http://localhost:1313/201611/java-repository-testing/[older
+posts]
+
+From my experience starting up with http://dbunit.sourceforge.net/[dbunit] is fast, easy and
+tempting to integrate into your routine but you should remember about the constant thing in the
+software development. Think ahead how annoying it will be o update all the .xml files after you've
+added required column... The point is that I don't recommend to use it. If it works for you that's
+great, but for me it is painfully hard to maintain. Instead create objects manually in the test
+given block and save them to the DB. Once you start to  setup objects manually for the test you'll
+quickly notice when objects are getting too big and it will be easier to spot the moment when things
+are getting out of hand.
+
+== Exotic storage
+
+[.center-image]
+image::/post/2017/database-migrations/exotic.jpeg[Support exotics storages]
+
+If you are using (or if you are forced to) weird solution to store your data you should carefully
+consider how often the storage schema might be modified. Even if it is filesystem you might want to
+create the directory structure, apply different name pattern include extra information in the file
+name, etc.
+
+You should estimate how much time you'll spend applying manual schema changes on this exotic
+storage. You should be pessimistic when estimating effort required for database migration. Multiply
+your estimations a bit. Each developer will be forced to execute those migrations on his machine,
+someone will be forced to execute those migrations on testing environment, UAT, production. So we
+have 4 team members and 3 environments. Each change takes at least 10 minutes to do... How many of
+them you'll have during application lifetime? What are the chances of clicking something wrong after
+executing the same steps for the third time?
+
+How long will it take to create a simple script which will check which version of the schema is
+currently applied and will execute all remaining migrations? The simplest possible solution can be
+implemented in a bash script. You'll be able to reproduce production issue on your local machine in
+by just checking out the production tag and booting up application. Just remember to ask google
+about your storage before you jump into development of the migration tool head first :)
+
+
+[.small]
+--
+Image credits:
+
+* https://www.pexels.com/photo/close-up-of-pink-baby-booties-326583/
+* https://www.pexels.com/photo/red-stop-sign-39080/
+* https://visualhunt.com/photo/128934/
+* https://visualhunt.com/photo/7968/
+* https://visualhunt.com/f2/photo/36499031732/044cea2fd8/
+* https://visualhunt.com/f2/photo/253870640/aa0720e27e/
+* https://www.pexels.com/photo/art-business-color-colorful-276267/
+* https://www.pexels.com/photo/board-chalk-chalkboard-exam-459793/
+* https://www.pexels.com/photo/close-up-of-a-iguana-325946/
+
+--
