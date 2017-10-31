@@ -39,7 +39,7 @@ image::/post/2017/database-migrations/new.jpeg[Brand new]
 
 When you are starting development of the brand new system based on the new database you don't need
 to write all the SQL by hand. In the initial phase of the project when you are getting familiar with
-the domain and incrementally develop and redesign/refactor your domain configure hibernate to update
+the domain and incrementally develop and redesign/refactor it configure hibernate to update
 (or even drop & create) the schema it will do in the initial phase and allow you to deliver core
 features faster. Once you think schema is stable enough configure Hibernate to print creation script
 and voila here is your first database version ;) Remember that this schema was created by stupid
@@ -50,7 +50,7 @@ Flyway now it is the time to change Hibernate settings. Configure it to validate
 time it starts. This way you'll be the first one to know when something is not right. The fail fast
 strategy is a feature. Sooner you will know about the problem the smaller is the chance of finding
 it on the production... When you support multiple databases it is ok to set it to ```none``` on
-non-production database type. For example, h2 and Oracle don't go along so well...
+non-production database type. For example, h2 and Oracle don't go along that well...
 
 == Do not execute any ddl/data update operations on db by hand
 
@@ -100,7 +100,7 @@ it unless Oracle or SQL Server are the only databases you are using. Also you sh
 is is easier for new developers to understand JDBC than to learn dialect of the DB you decided to
 use.
 
-Avoid DB dedicated dialects because using it might be impossible/very hard to have shared migration
+Avoid DB dedicated dialects because when using it might be impossible/very hard to have shared migration
 scripts. Instead of the PLSQL/TSQL, you can write your migrations in the plain JDBC. It will work on
 SQL Server, Oracle and h2 and you will have only one script responsible for migration. It shouldn't
 take much longer to migrate your DB using PLSQL or JDBC. Just remember about a volume of the data
@@ -210,7 +210,7 @@ From my experience starting up with http://dbunit.sourceforge.net/[dbunit] is fa
 tempting to integrate into your routine but you should remember about the constant thing in the
 software development. Think ahead how annoying it will be o update all the .xml files after you've
 added required column... The point is that I don't recommend to use it. If it works for you that's
-great, but for me it is painfully hard to maintain. Instead create objects manually in the test
+great, but for me it is painfully hard to maintain. Instead create objects manually in the test's
 given block and save them to the DB. Once you start to  setup objects manually for the test you'll
 quickly notice when objects are getting too big and it will be easier to spot the moment when things
 are getting out of hand.
