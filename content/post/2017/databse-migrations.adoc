@@ -13,10 +13,10 @@ experiences and thoughts on evolving database schema.
 
 <!--more-->
 
-Note that I'm Java guy so I like relational databases and https://flywaydb.org/[Flyway] ;) But most of those practices are
-universal, only solutions might differ. Flyway is a really simple library but as a usual devil is in
-the details. I've been using it for a few years now and noticed few things that do work and some of
-them which do not.
+Note that I'm Java guy so I like relational databases and https://flywaydb.org/[Flyway] ;) But most
+of those practices are universal, only solutions might differ. Flyway is a really simple library but
+as a usual devil is in the details. I've been using it for a few years now and noticed few things
+that do work and some of them which do not.
 
 == tl;dr
 
@@ -39,11 +39,11 @@ image::/post/2017/database-migrations/new.jpeg[Brand new]
 
 When you are starting development of the brand new system based on the new database you don't need
 to write all the SQL by hand. In the initial phase of the project when you are getting familiar with
-the domain and incrementally develop and redesign/refactor it configure hibernate to update
-(or even drop & create) the schema it will do in the initial phase and allow you to deliver core
-features faster. Once you think schema is stable enough configure Hibernate to print creation script
-and voila here is your first database version ;) Remember that this schema was created by stupid
-machine so read it carefully and tweak it to be sure that generated SQL is exactly what you want.
+the domain and incrementally develop and redesign/refactor it configure hibernate to update (or even
+drop & create) the schema it will do in the initial phase and allow you to deliver core features
+faster. Once you think schema is stable enough configure Hibernate to print creation script and
+voila here is your first database version ;) Remember that this schema was created by stupid machine
+so read it carefully and tweak it to be sure that generated SQL is exactly what you want.
 
 Once you are out of the initial development phase and you have at least one migration executed by
 Flyway now it is the time to change Hibernate settings. Configure it to validate the schema every
@@ -100,12 +100,12 @@ it unless Oracle or SQL Server are the only databases you are using. Also you sh
 is is easier for new developers to understand JDBC than to learn dialect of the DB you decided to
 use.
 
-Avoid DB dedicated dialects because when using it might be impossible/very hard to have shared migration
-scripts. Instead of the PLSQL/TSQL, you can write your migrations in the plain JDBC. It will work on
-SQL Server, Oracle and h2 and you will have only one script responsible for migration. It shouldn't
-take much longer to migrate your DB using PLSQL or JDBC. Just remember about a volume of the data
-and in case of complicated migrations on big database use pagination, cursors or something to avoid
-unexpected out of memory exceptions.
+Avoid DB dedicated dialects because when using it might be impossible/very hard to have shared
+migration scripts. Instead of the PLSQL/TSQL, you can write your migrations in the plain JDBC. It
+will work on SQL Server, Oracle and h2 and you will have only one script responsible for migration.
+It shouldn't take much longer to migrate your DB using PLSQL or JDBC. Just remember about a volume
+of the data and in case of complicated migrations on big database use pagination, cursors or
+something to avoid unexpected out of memory exceptions.
 
 Once you are committed to use JDBC for migrations you must not use any of your production code in
 the migrations. You might be tempted to use DTO or JPA entity in the migration which fits perfectly
