@@ -1,0 +1,169 @@
+---
+title: "Conversions in spring"
+Tags: ["java", "spring"]
+Categories: ["java"]
+description: "Argument conversions in spring"
+date: "2017-11-10"
+---
+
+The story is really simple. I wanted to accept my class as rest controller method param. I decided
+that I don't want to convert a simple string to object every time and it would be faster if I do the
+conversion in the single place. After a quick research I've found
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/core/convert/converter/Converter.html[Converter]
+interface which looked like perfect for the job. After some digging and investigation it turns out
+that there is a lot of automagic in the Spring conversion service.
+
+<!--more-->
+
+Let's start from the beginning and the controller I want to have:
+
+{{<highlight java>}}
+@WebMvcTest(controllers = Controller.class)
+@RunWith(SpringRunner.class)
+public class ControllerTest {
+  @Autowired
+  private MockMvc mockMvc;
+
+  @Test
+  public void should_parse_id_from_plain_string() throws Exception {
+    //given
+    final String emptyId = "00000000-0000-0000-0000-000000000000";
+
+    //when
+    mockMvc.perform(MockMvcRequestBuilders.get("/find-id/" + emptyId))
+
+        //then
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id", equalTo(emptyId)));
+  }
+}
+{{</highlight>}}
+
+In order to make this test pass I need the controller:
+
+{{<highlight java>}}
+@RestController
+class Controller {
+  @GetMapping("/find-id/{id}")
+  public ObjectToFind findId(@PathVariable Id id) {
+    return new ObjectToFind(id);
+  }
+
+  static class ObjectToFind {
+    private final String id;
+
+    private ObjectToFind(Id id) {
+      this.id = id.toString();
+    }
+
+    public String getId() {
+      return id;
+    }
+  }
+}
+{{</highlight>}}
+
+Note that I expect custom type as an input parameter of the findOne method. If I try to run those
+tests it will fail which makes sense because spring has no idea how to handle my Id class. My first
+approach, which failed, was to implement Converter interface and register it as a bean. Something
+like this:
+
+{{<highlight java>}}
+@Component
+class IdConverter implements Converter<String, Id> {
+  @Override
+  public Id convert(String source) {
+    return new Id(UUID.fromString(source));
+  }
+}
+{{</highlight>}}
+
+It looks clean. It has single responsibility, doesn't have any state, and is easy to test. It will
+work if you start your application using bootRun or if your tests set up full spring context. The
+problem is I am too lazy to start the whole application to manually check if my controllers work, or
+wait until application context boots up (this requires setting up the DB, configuring tons of other
+beans, in general, it takes time).
+
+The problem and the solution are hidden deep in the @WebMvcTest. To be more specific problem is in
+the @TypeExcludeFilter registered in the
+https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/spring-boot-test-autoconfigure/src/main/java/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTest.java#L75[@WebMvcTest]
+If you look into the filter implementation you'll notice classes that are considered to be the part
+of
+https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/spring-boot-test-autoconfigure/src/main/java/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTypeExcludeFilter.java#L49[web
+environment]. Converter nor @Component are not considered to be the part of the web environment. So
+now we know why it is not picked up while running tests.
+
+To be honest, my first approach was
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/bind/annotation/InitBinder.html[@InitBinder]
+and ancient https://docs.oracle.com/javase/8/docs/api/java/beans/PropertyEditor.html[PropertyEditor]
+which is not as nice as stateless Converter but it will work:
+
+{{<highlight java>}}
+@ControllerAdvice
+class ArgumentConverterBinder {
+  @InitBinder
+  void setupBinder(WebDataBinder binder) {
+    binder.registerCustomEditor(Id.class, new IdPropertyEditor());
+  }
+
+  private class IdPropertyEditor extends PropertyEditorSupport {
+    @Override
+    public String getAsText() {
+      return getValue() != null
+          ? getValue().toString()
+          : "";
+    }
+
+    @Override
+    public void setAsText(String text) throws IllegalArgumentException {
+      setValue(new Id(UUID.fromString(text)));
+    }
+  }
+}
+{{</highlight>}}
+
+Luckily at some point, it clicked that @ControllerAdvice is basically @Component. Turns out all I
+had to do was to change from @Component to @ControllerAdvice and that's all. No more property
+editors and no more WebDatabinders :)
+
+First I created the solution with ProeprtyEditor, then after finding out a bit hacky
+@ControlerAdvice I've discovered yet another solution to the problem. It is the simplest one from
+the developer perspective but requires a lot of "magic" from the spring. All you have to do to have
+automatic conversion of raw string passed in http url to your class in a @Controller method
+parameter is to create public (that's important) constructor which accepts single String as
+parameter. If you are interested in how this works you should take a look at
+https://github.com/spring-projects/spring-framework/blob/master/spring-core/src/main/java/org/springframework/core/convert/support/ObjectToObjectConverter.java[ObjectToObjectConverter].
+
+It is also worth pointing out that spring do support a lot of types out of the box. Here is the list
+of some of the interesting converters registered by default in spring:
+
+{{<highlight text>}}
+org.springframework.core.convert.support.StringToEnumConverterFactory
+org.springframework.core.convert.support.StringToLocaleConverter
+org.springframework.core.convert.support.StringToCharacterConverter
+org.springframework.core.convert.support.StringToCurrencyConverter
+org.springframework.core.convert.support.StringToPropertiesConverter
+org.springframework.core.convert.support.StringToUUIDConverter
+org.springframework.core.convert.support.StringToArrayConverter
+org.springframework.core.convert.support.StringToCollectionConverter
+org.springframework.core.convert.support.StringToTimeZoneConverter
+{{</highlight>}}
+
+And a lot of converters for  jsr310 (new date time API) not to mention joda date time converts if
+you have joda on the classpath
+
+You can find examples usage converters for some of those converts on my
+https://github.com/pchudzik/blog-example-spring-converters/blob/master/src/test/java/com/pchudzik/blog/example/springconverter/BuiltInConvertersControllerTest.java[GitHub].
+
+When I started writing this post I thought I will end it with hacky @ControllerAdvice. Turns out
+there is so much more to automagic types conversion available in spring. I'm sure that during my
+career I've written at least one or two converters for the types that are now handled by the spring
+out of the box. To feel better I keep telling myself that a lot of those converts must've been added
+recently, but I'm not sure if I want to check when they've been created ;)
+
+[.small]
+--
+Samples can be found on my https://github.com/pchudzik/blog-example-spring-converters[GitHub].
+
+Tested with spring-boot 1.5.7
+--
