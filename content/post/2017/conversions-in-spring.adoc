@@ -63,10 +63,10 @@ class Controller {
 }
 {{</highlight>}}
 
-Note that I expect custom type as an input parameter of the findOne method. If I try to run those
-tests it will fail which makes sense because spring has no idea how to handle my Id class. My first
-approach, which failed, was to implement Converter interface and register it as a bean. Something
-like this:
+Note that I expect custom type as an input parameter of the findOne method. If I try to run this
+test it will fail which makes sense because spring has no idea how to handle my Id class. My first
+approach, which failed, was to implement Converter interface and register it as a spring bean.
+Something like this:
 
 {{<highlight java>}}
 @Component
@@ -87,11 +87,11 @@ beans, in general, it takes time).
 The problem and the solution are hidden deep in the @WebMvcTest. To be more specific problem is in
 the @TypeExcludeFilter registered in the
 https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/spring-boot-test-autoconfigure/src/main/java/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTest.java#L75[@WebMvcTest]
-If you look into the filter implementation you'll notice classes that are considered to be the part
-of
+If you look into the filter implementation you'll notice classes that are considered to be part of
+the
 https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/spring-boot-test-autoconfigure/src/main/java/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTypeExcludeFilter.java#L49[web
-environment]. Converter nor @Component are not considered to be the part of the web environment. So
-now we know why it is not picked up while running tests.
+environment]. Converter nor @Component are not considered to be the part of it. So now we know why
+it is not picked up while running tests.
 
 To be honest, my first approach was
 https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/bind/annotation/InitBinder.html[@InitBinder]
@@ -129,13 +129,13 @@ editors and no more WebDatabinders :)
 First I created the solution with ProeprtyEditor, then after finding out a bit hacky
 @ControlerAdvice I've discovered yet another solution to the problem. It is the simplest one from
 the developer perspective but requires a lot of "magic" from the spring. All you have to do to have
-automatic conversion of raw string passed in http url to your class in a @Controller method
-parameter is to create public (that's important) constructor which accepts single String as
-parameter. If you are interested in how this works you should take a look at
+automatic conversion of raw string to your class in a @Controller method is to create public (that's
+important) constructor which accepts single String as parameter. If you are interested in how this
+works you should take a look at
 https://github.com/spring-projects/spring-framework/blob/master/spring-core/src/main/java/org/springframework/core/convert/support/ObjectToObjectConverter.java[ObjectToObjectConverter].
 
-It is also worth pointing out that spring do support a lot of types out of the box. Here is the list
-of some of the interesting converters registered by default in spring:
+It is also worth pointing out that spring does support a lot of types out of the box. Here is the
+list of some of the interesting converters registered by default in spring:
 
 {{<highlight text>}}
 org.springframework.core.convert.support.StringToEnumConverterFactory
