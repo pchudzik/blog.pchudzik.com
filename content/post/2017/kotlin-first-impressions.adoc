@@ -1,0 +1,210 @@
+---
+title: "Kotlin first impressions"
+Tags: ["development", "interesting"]
+Categories: ["other"]
+description: "Kotlin first impressions"
+date: "2017-11-29"
+---
+
+
+Recently while starting work on a project we've (team of two ;)) decided to try something new and
+use Kotlin. The project is far from ready and still under active development, but after writing some
+code in Kotlin I've got few observations I'd like to share.
+
+<!--more-->
+
+
+== What I like about kotlin
+
+=== Immutability by default
+
+Everything is immutable by default. Collections are immutable, classes are final, fields are usually
+immutable (```val```). Those all are great design assumptions (final classes are tricky while testing or
+in java frameworks, but there are workarounds) which should pay off in long-term.
+
+=== No need for lombok for data transfer objects
+
+Lombok is great library to avoid writing a lot of boilerplate code. In Kotlin you don't need it. In
+Kotlin you have data classes which are perfect for handling DTOs. You have immutable data structures
+with equals and hashCode implemented for free. As an extra, you've got something like builder (named
+parameters are awesome) and all the getters in just a few lines of code. Is awesome simple data
+structures without any logic inside.
+
+{{<highlight kotlin>}}
+data class TeamPreferencesDto(
+  val extraRequirements: String,
+  val preferredTechnologies: Set<Id>,
+  val requiredTechnologies: Set<Id>,
+  val minTeamSize: Int?,
+  val maxTeamSize: Int?)
+{{</highlight>}}
+
+=== Extensions methods
+
+
+
+This one is great. I've written my share of helpers and stuff for things that weren't so useful out
+of the box, or required to pass the same arguments all over the application. With extensions
+methods, I'm not forced to create static methods and other hacks to work around the API of external
+vendor. Now I can create extension method and fix the API myself :) What I particularly like about
+it is that under the hood it is a static method, not bytecode manipulation.
+
+Here is what we did to avoid repeating the same code in all of the tests:
+
+{{<highlight kotlin>}}
+private fun MockHttpServletRequestBuilder.withJsonContent(jsonBody: String) = this
+  .contentType(MediaType.APPLICATION_JSON)
+  .content(jsonBody)
+
+fun MockHttpServletRequestBuilder.withJsonContent(vararg entries: Pair<String, Any?>) = this
+  .withJsonContent(jsonStringify(*entries))
+
+fun MockHttpServletRequestBuilder.withJsonContent(map: Map<String, Any?>) = this
+  .withJsonContent(jsonStringify(map))
+{{</highlight>}}
+
+=== Compact syntax
+
+With few exceptions, I like the syntax of Kotlin language. It is very compact and easy to read. I
+like the way how you can implement functions. For example when using spring very often controller's
+only responsibility is to have MVC annotation and call the service. With Kotlin syntax is very
+simple:
+
+{{<highlight kotlin>}}
+@PutMapping("/{projectId}/team-preferences")
+@ResponseStatus(HttpStatus.NO_CONTENT)
+fun updateTeamPreferences(
+  @PathVariable projectId: Id,
+  @RequestBody teamPreferences: TeamPreferencesDto)
+  = projectService.updateTeamPreferences(projectId, teamPreferences)
+{{</highlight>}}
+
+=== Statically typed language with a lot of compiler help to figure out types of data
+
+Kotlin's compiler is great in figuring out the types of your data. Support of this "dynamic typing" in
+IntelliJ is really good. Just say your field is val and compiler will know what you had in mind.
+
+=== Ok(ish) spring and hibernate support
+
+When we were starting we decided to use some of the technologies that are familiar to us (we want to
+deliver not just play with new toys) because of that we decided to use spring and hibernate. At
+first, I was little afraid of how it will work out with Kotlin. Turns out it works ok. Sure there
+are some plugins you'll need to add but once you are done with the configuration you are good to go.
+It is worth pointing out that spring 5 supports Kotlin (didn't test it) and you can write build
+scripts in Kotlin and Gradle.
+
+To make Kotlin work with spring and hiberante just drop few plugins which change behaviour of
+Kotlin's compiler:
+
+{{<highlight groovy>}}
+buildscript {
+  ext {
+    kotlinVersion = "1.1.60"
+  }
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+    classpath "org.jetbrains.kotlin:kotlin-allopen:$kotlinVersion"
+    classpath "org.jetbrains.kotlin:kotlin-noarg:$kotlinVersion"
+  }
+}
+
+apply plugin: "kotlin"
+apply plugin: "kotlin-spring"
+apply plugin: "kotlin-jpa"
+{{</highlight>}}
+
+=== Great integration with java
+
+I've mixed Java and Kotlin both ways (Java using Kotlin, Kotlin using Java) and it worked just fine.
+Luckily until now, there was only single thing I needed to do in Java because it was impossible in
+Kotlin.
+
+=== Named parameters
+
+This one is awesome :) Even if you have 2 or 3 parameters it is nice to have a possibility to be
+verbose about the stuff you do (I like my code to be easy to read and verbosity is one way of
+achieving it ;)).
+
+=== Null handling
+
+With Kotlin null checks are basically enforced during compilation. Sure you can get NPE or
+IllegalArgumentException while trying to pass null to a not nullable field but the compiler will
+help you out a lot. What is the most important from my perspective (it aligns with my private
+policy) is that Kotlin forces you to think about null values ahead of time not just after NPE is
+thrown on production.
+
+== What I don't like about Kotlin
+
+=== Hacks to make it working with Mockito and other Java frameworks/libraries
+
+Every class is final by default and idea behind is great but down to earth work with this might be
+troublesome. It is especially true when you avoid writing interfaces just to have them with a single
+implementation. Luckily there is a solution to this:
+
+To make mockito stub final classes add file
+src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker with content:
+
+{{<highlight text>}}
+mock-maker-inline
+{{</highlight>}}
+
+=== Hacks to create getter for field which doesn't exist or of different type
+
+Everything in Kotlin is property which means unless it is private you can access it. What it means
+is that in case when field you've created is of type X but you want to return Y as result of getter
+you need to write hacks to make it work.
+
+{{<highlight kotlin>}}
+@OneToMany
+private var _preferredTechnologies: MutableSet<Technology> =  = mutableSetOf()
+val preferredTechnologies: Set<Technology>
+  get () = _preferredTechnologies.toSet()
+{{</highlight>}}
+
+=== Everything is either private or public
+
+What it basically means is that either you cannot access me or anyone can do whatever they want with
+me. I like my code to be more organized than this. I create packages which are responsible for
+handling one particular thing, and usually, a bunch of those small things is building something
+bigger. With everything public or private (I'm not going to create separate Gradle/Maven module with
+4 classes just to use internal visibility) I can not say what is public API of my package. I'm not
+going to put everything in one file either - I will not create a big file just to share private
+stuff inside it.
+
+=== It's easy to create global functions and global variables
+
+I'm still wrapping my head around this one. I mean I've seen this in javascript or python, but JVM
+is not node ;) It might be very nice thing in some cases, but on the other hand, it is scary how
+easy it is :)
+
+=== Java annotations are not fully supported
+
+More like an observation than real problem :) You can live with it mixing java and Kotlin code. You
+can not annotate attributes of your annotation with other annotation (@AliasFor in spring). Luckily
+you can create this annotation in pure java and use it in Kotlin.
+
+== Summary
+
+The thing that bothers me a lot is no convention on how to writer getters (properties) and that it
+is enforced by the way how you write your code (syntax). Because of this, you have to write ugly
+hacks to create APIs which are consistent with Kotlin look'n'feel. It usually happens in the domain
+so workaround might be very simple - create models in plain old java which can look nice and clean
+with a bit of Lombok :)
+
+The most painful thing, I think is not acceptable for a really big project (we might live in
+microservices era right now, but sometimes micro is not so micro after some time...) is that Kotlin
+has basically only private and public visibility and nothing else. There is also protected and
+private but those are different things. I feel uncomfortable creating a public class which I know
+should not be used by anyone from outside my package. This is not good. Working with this kind of
+code in bigger projects requires a lot of self-discipline which might be hard to keep in check under
+pressure and/or in project lifespan...
+
+If in the future Kotlin will introduce something like package scope and figure out better
+conventions for writing getters instead of syntax then it'll probably become my language of choice
+:) Until then I can recommend it for small projects where the domain is simple (or not existing) and
+code base will not grow too big. Otherwise, it might require a lot of self-discipline to keep it
+clean and tidy. I think that in a long-term the best way of keeping yourself disciplined is a
+compilation error :)
