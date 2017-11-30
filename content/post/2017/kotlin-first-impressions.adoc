@@ -124,8 +124,8 @@ fun updateTeamPreferences(
 Lombok is great library to avoid writing a lot of boilerplate code. In Kotlin you don't need it. In
 Kotlin you have data classes which are perfect for handling DTOs. You have immutable data structures
 with equals and hashCode implemented for free. As an extra, you've got something like builder (named
-parameters are awesome) and all the getters in just a few lines of code. Is awesome simple data
-structures without any logic inside.
+parameters are awesome) and all the getters in just a few lines of code. This is great for simple
+data structures without any logic inside.
 
 {{<highlight kotlin>}}
 data class TeamPreferencesDto(
@@ -144,7 +144,7 @@ What it basically means is that either you cannot access me or anyone can do wha
 me. I like my code to be more organized than this. I create packages which are responsible for
 handling one particular thing, and usually, a bunch of those small things is building something
 bigger. With everything public or private (I'm not going to create separate Gradle/Maven module with
-4 classes just to use internal visibility) I can not say what is public API of my package. I'm not
+4 classes just to use internal visibility) I cannot say what is public API of my package. I'm not
 going to put everything in one file either - I will not create a big file just to share private
 stuff inside it.
 
@@ -152,7 +152,7 @@ stuff inside it.
 
 Everything in Kotlin is property which means unless it is private you can access it. What it means
 is that in case when field you've created is of type X but you want to return Y as result of getter
-you need to write hacks to make it work.
+you'll have to to write hacks to make it work.
 
 {{<highlight kotlin>}}
 @OneToMany
@@ -169,7 +169,7 @@ easy it is :)
 
 === Hacks to make it working with Mockito and other Java frameworks/libraries
 
-Every class is final by default and idea behind is great but down to earth work with this might be
+Every class is final by default. Idea behind is great but down to earth work with this might be
 troublesome. It is especially true when you avoid writing interfaces just to have them with a single
 implementation. Luckily there is a solution to this:
 
@@ -184,8 +184,8 @@ mock-maker-inline
 
 More like an observation than real problem :) You can live with it mixing java and Kotlin code. You
 can not annotate attributes of your annotation with other annotation
-https://youtrack.jetbrains.com/issue/KT-11475[KT-11475] (for example @AliasFor in spring). Luckily
-you can create this annotation in pure java and use it in Kotlin.
+https://youtrack.jetbrains.com/issue/KT-11475[KT-11475] (for example ```@AliasFor``` in spring).
+Luckily you can create this annotation in pure java and use it in Kotlin.
 
 == Summary
 
@@ -195,7 +195,7 @@ hacks to create APIs which are consistent with Kotlin look'n'feel. It usually ha
 so workaround might be very simple - create models in plain old java which can look nice and clean
 with a bit of Lombok :)
 
-The most painful thing (worse than getters hacks), I think is not acceptable for a really big
+The most painful thing (worse than getters hacks), for me this is not acceptable for a really big
 project (we might live in the microservices era right now, but sometimes micro is not so micro after
 some time...) is that Kotlin has basically only private and public visibility and nothing else.
 There is also protected and private but those are different things. I feel uncomfortable creating a
