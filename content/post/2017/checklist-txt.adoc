@@ -1,5 +1,5 @@
 ---
-title: "Control your manual release"
+title: "Control your release"
 Tags: ["howto", "other", "development"]
 Categories: ["best practices"]
 date: "2017-12-07"
@@ -22,7 +22,7 @@ image::/post/2017/checklist-txt/checklist.jpg[Checklist]
 In the perfect world, everything should be automated and everything should be done by scripts so you
 can do the continuous delivery of your product. Unfortunately we don't live in perfect world and
 sometimes we are just still getting there... Automation might be very hard or impossible to achieve
-or maybe you've decided to this one thing manually just this one time... (Luckily with containers
+or maybe you've decided to do this one thing manually just this one time... (Luckily with containers
 automation is getting easier and easier so hopefully this post will get outdated really soon :))
 
 To make sure that everything that is required is done after the release you can try to put
@@ -32,11 +32,11 @@ that must be done before/during/after the release. With a bit of luck it will be
 sometimes there are things that you didn't have a chance to automate yet or are one-timers that you
 believe will not happen in the future.
 
-In my old team, we had this stinky link:/post/2017/checklist-txt/sharepoint.jpg[SharePoint] stuff that we've been managing manually for some time
-and it was very challenging for us to track what we must do to make it work after the release. The
-ultimate solution was to automate the process (which we eventually did after we discovered how
-boring and annoying it was :)). A temporary solution was plain (almost ;)) text file which looked
-something like this:
+In my old team, we had this stinky link:/post/2017/checklist-txt/sharepoint.jpg[SharePoint] stuff
+that we've been managing manually for some time and it was very challenging for us to track what we
+must do to make it work after the release. The ultimate solution was to automate the process (which
+we eventually did after we discovered how boring, annoying and error prone it was :)). A temporary
+solution was plain (almost ;)) text file which looked something like this:
 
 {{<highlight text>}}
 
@@ -69,16 +69,16 @@ must be done, but the release manager (fancy name, but it was just the person wh
 release process) might not know the context and therefore might not understand what author had in
 mind. Or even worse author might have forgotten to update the wiki page...
 
-Once we got burned the second time we decided that it will not work this way. Our solution was
+Once we got slipped on it few times we decided that it will not work this way. Our solution was
 simple. Move wiki page to the git repo. Once the file is in the repo you have easy access to the
-history, but what was more important this file become part of our code base. We reviewed it like any
-other part of the code. It was the simplest way of ensuring that the author created instructions and
-that other people understand. Once we migrated it to VCS we were able to notice when author forgot
-to update the file while changing something in the code. After some time we also implemented the
-rule that author of the change must not deploy his change on dev environment. We wanted to make sure
-that those instructions were clear and easy to follow for a person without the background in
-particular change (we had "complicated" release process and we were unable to release as often as
-we'd like to).
+history, but what was more important this file become part of our code base and therefore part of
+the process. We reviewed it like any other part of the code. It was the simplest way of ensuring
+that the author created instructions and that other people understand. Once we migrated it to VCS we
+were able to notice when author forgot to update the file while changing something in the code.
+After some time we also implemented the rule that author of the change must not deploy his change on
+dev environment. We wanted to make sure that those instructions were clear and easy to follow for a
+person without the background in particular change (we had "complicated" release process and we were
+unable to release as often as we'd like to).
 
 The solution is stupidly simple but it worked for us until the point we were able to automate the
 most troublesome parts of the process.
