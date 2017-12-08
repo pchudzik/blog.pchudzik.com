@@ -69,19 +69,19 @@ must be done, but the release manager (fancy name, but it was just the person wh
 release process) might not know the context and therefore might not understand what author had in
 mind. Or even worse author might have forgotten to update the wiki page...
 
-Once we got slipped on it few times we decided that it will not work this way. Our solution was
-simple. Move wiki page to the git repo. Once the file is in the repo you have easy access to the
-history, but what was more important this file become part of our code base and therefore part of
-the process. We reviewed it like any other part of the code. It was the simplest way of ensuring
-that the author created instructions and that other people understand. Once we migrated it to VCS we
+Once we slipped on it few times we decided that it will not work this way. Our solution was simple.
+Move wiki page to the git repo. Once the file is in the repo you have easy access to the history,
+but what was more important this file become part of our code base and therefore part of the
+process. We reviewed it like any other part of the code. It was the simplest way of ensuring that
+the author created instructions and that other people understand it. Once we migrated it to VCS we
 were able to notice when author forgot to update the file while changing something in the code.
 After some time we also implemented the rule that author of the change must not deploy his change on
 dev environment. We wanted to make sure that those instructions were clear and easy to follow for a
 person without the background in particular change (we had "complicated" release process and we were
 unable to release as often as we'd like to).
 
-The solution is stupidly simple but it worked for us until the point we were able to automate the
-most troublesome parts of the process.
+The solution is stupid simple but it worked for us just fine up until the point we were able to
+automate the most troublesome parts of the process.
 
 
 [.small]
