@@ -1,0 +1,220 @@
+---
+title: "Bisect the dragon"
+Tags: ["howto", "interesting", "git"]
+Categories: ["other"]
+description: "Bisect the dragon"
+date: "2017-12-21"
+---
+
+It all started on Friday, like many of the bad things that can happen in software ;) We've been
+working for some time and after being blocked with deployments for a long time (don't ask, you don't
+want to know ;)) we were finally able to deploy a new version. Our last release was about week ago.
+Do the deployment - seems like the easy thing to do. I've triggered deploy plan on Jenkins and it's
+failed. Here is the story how I've fixed something that looked like hours of analysis in few
+minutes.
+
+<!--more-->
+
+Long story short, as a part of deployment process the new version is set by Jenkins and it failed.
+The output of the build ended with something like this:
+
+{{<highlight text>}}
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.926 s
+[INFO] Finished at: 2017-12-10T20:47:05+01:00
+[INFO] Final Memory: 15M/188M
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.codehaus.mojo:versions-maven-plugin:2.3:set (default-cli) on
+project bisect-the-dragon: Execution default-cli of goal
+org.codehaus.mojo:versions-maven-plugin:2.3:set failed.: EmptyStackException -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
+{{</highlight>}}
+
+Running with debug (-X) wasn't helpful at all. I went through all 5 stages of bug fixing process:
+
+[%hardbreaks]
+Denial - I've run the build 2 more times just to be sure ;)
+Anger - wtf is going on?
+Bargaining - maybe Jenkins is broken I'll run this locally just to be sure
+Depression - what has happened and why it is happening to me on Friday?
+Challenge accepted - I'm going to find the problem and fix it
+
+Let's skip to the last phase because it was the most productive one...
+
+I've started by investigating git log. A lot of changes... So maybe I'll find changes in pom.xml
+files only. Still, more then I'd want to review manually and the team is waiting for the deployment.
+Luckily I've decided not to figure this out with an empty stomach. During lunch I've recalled
+"exotic" command - git bisect. After checking out google on how to use it I was ready for next
+round. Using git bisect I was able to find the problem in a matter of few minutes...
+
+For educational purposes, I've created the very simple project which simulates the process.
+
+Before we start we'll need two commits. First is the bad one - usually top of the HEAD. Second is
+good one, for me, it was the last release
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git log
+a4cb0c8 Pawel Chudzik 3 seconds ago : added cleanup script
+c87de46 Pawel Chudzik 21 hours ago : cleanup
+6d2df59 Pawel Chudzik 21 hours ago : added readme.md
+e7072fa Pawel Chudzik 21 hours ago : fixed project setup with separete corporate poms
+6132330 Pawel Chudzik 9 days ago : added diff file
+96ae05b Pawel Chudzik 9 days ago : set compiler plugin version
+9aaffa5 Pawel Chudzik 9 days ago : add assertj
+443afc9 Pawel Chudzik 9 days ago : run tests alphabetical
+bb86569 Pawel Chudzik 9 days ago : bumped corporate pom version
+85c13b6 Pawel Chudzik 9 days ago : added support for java 8
+2bfd094 Pawel Chudzik 9 days ago : increased memory for tests
+7020b21 Pawel Chudzik 9 days ago : added corporate pom
+31c1fc6 Pawel Chudzik 9 days ago : added tests
+2971dca Pawel Chudzik 9 days ago : added code
+6fd3a3d Pawel Chudzik 9 days ago : initial commit
+
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect start
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect bad
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect good 6fd3a3d
+Bisecting: 6 revisions left to test after this (roughly 3 steps)
+[443afc9780758bcbed101e252a4968ad28d9f202] run tests alphabetical
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$
+{{</highlight>}}
+
+Now we can start the hard work ;)
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
+[ERROR] Failed to execute goal org.codehaus.mojo:versions-maven-plugin:2.3:set (default-cli) on
+project bisect-the-dragon: Execution default-cli of goal
+org.codehaus.mojo:versions-maven-plugin:2.3:set failed.: EmptyStackException -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
+{{</highlight>}}
+
+Ok it failed let's tell git about it:
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ g bisect bad
+Bisecting: 3 revisions left to test after this (roughly 2 steps)
+[7020b21674e20b4352b10708d553c21dcbaf1bcc] added corporate pom
+{{</highlight>}}
+
+Let's check again:
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
+{{</highlight>}}
+
+It has passed. Ok let's clean up and let git know that it is working now:
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git clean -f && git checkout -- .
+Removing project/pom.xml.versionsBackup
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect good
+Bisecting: 1 revision left to test after this (roughly 1 step)
+[85c13b67b5f41a0beb42c8d44040739497b6584b] added support for java 8
+{{</highlight>}}
+
+Now all I have to do is to run the procedure unit git will tell us which commit caused the problem
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
+[ERROR] Failed to execute goal org.codehaus.mojo:versions-maven-plugin:2.3:set (default-cli) on
+project bisect-the-dragon: Execution default-cli of goal
+org.codehaus.mojo:versions-maven-plugin:2.3:set failed.: EmptyStackException -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
+
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect bad
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[2bfd094fa8609d3451d0bc3ad1d73b933ca781fa] increased memory for tests
+
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
+[ERROR] Failed to execute goal org.codehaus.mojo:versions-maven-plugin:2.3:set (default-cli) on
+project bisect-the-dragon: Execution default-cli of goal
+org.codehaus.mojo:versions-maven-plugin:2.3:set failed.: EmptyStackException -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
+
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect bad
+2bfd094fa8609d3451d0bc3ad1d73b933ca781fa is the first bad commit
+commit 2bfd094fa8609d3451d0bc3ad1d73b933ca781fa
+Author: Pawel Chudzik <pawel.chudzik@gmail.com>
+Date:   Sun Dec 10 20:28:23 2017 +0100
+
+    increased memory for tests
+
+:040000 040000 a17896b12538fb24faeda856cc384250f5a08865 b76a330e3e358b1814cfee11d3355aecbc7da10c M	project
+{{</highlight>}}
+
+Ups that's on me :P let's investigate the commit (note that git printed hashes of commits to
+compare):
+
+{{<highlight diff>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git diff a17896b12538fb24faeda856cc384250f5a08865 b76a330e3e358b1814cfee11d3355aecbc7da10c
+diff --git a/pom.xml b/pom.xml
+index d12fc44..2d09e6c 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -26,4 +26,21 @@
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
++
++   <build>
++     <plugins>
++       <plugin>
++         <groupId>org.apache.maven.plugins</groupId>
++         <artifactId>maven-surefire-plugin</artifactId>
++         <version>2.20.1</version>
++         <configuration>
++           <systemPropertyVariables>
++             <mysql.workdir:data>/tmp/mysql/data</mysql.workdir:data>
++             <mysql.workdir:logs>/tmp/mysql/logs</mysql.workdir:logs>
++           </systemPropertyVariables>
++           <argLine>-Xmx256m</argLine>
++         </configuration>
++       </plugin>
++     </plugins>
++   </build>
+ </project>
+{{</highlight>}}
+
+Ok nothing interesting at first glance, but those systemPropertyVariables looks fishy, why do I need
+to configure MySQL for tests? Turn's out that colon is a forbidden character in this context. A
+pretty lame problem, but it has passed all previous (up to install) phases but version setting...
+
+After finding out broken commit I've decided to read the manual of
+https://git-scm.com/docs/git-bisect[git bisect] and found out that I could've automated the whole
+process:
+
+{{<highlight text>}}
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect start
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect bad
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect good 6fd3a3d
+Bisecting: 6 revisions left to test after this (roughly 3 steps)
+[443afc9780758bcbed101e252a4968ad28d9f202] run tests alphabetical
+pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git bisect run sh -c "(cd project && mvn versions:set -DgenerateBackupPoms=false -DnewVersion=1.0.0 && git checkout -- .)"
+{{</highlight>}}
+
+This will automatically run the whole bug tracking process and pinpoint broken commit automatically.
+With this knowledge, I'll be able to work smarter not harder in the future :)
+
+My example was lame and because of that I came up with the git bisect solution but now I see a lot
+of potential in this tool and I'm pretty sure it will save me some more time in the future.
