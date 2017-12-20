@@ -42,7 +42,7 @@ Running with debug (-X) wasn't helpful at all. I went through all 5 stages of bu
 Denial - I've run the build 2 more times just to be sure ;)
 Anger - wtf is going on?
 Bargaining - maybe Jenkins is broken I'll run this locally just to be sure
-Depression - what has happened and why it is happening to me on Friday?
+Depression - why it is happening to me on Friday?
 Challenge accepted - I'm going to find the problem and fix it
 
 Let's skip to the last phase because it was the most productive one...
@@ -50,8 +50,8 @@ Let's skip to the last phase because it was the most productive one...
 I've started by investigating git log. A lot of changes... So maybe I'll find changes in pom.xml
 files only. Still, more then I'd want to review manually and the team is waiting for the deployment.
 Luckily I've decided not to figure this out with an empty stomach. During lunch I've recalled
-"exotic" command - git bisect. After checking out google on how to use it I was ready for next
-round. Using git bisect I was able to find the problem in a matter of few minutes...
+"exotic" command - git bisect. After checking out google for information how to use it I was ready
+for next round. Using git bisect I was able to find the problem in a matter of few minutes...
 
 For educational purposes, I've created the very simple project which simulates the process.
 
@@ -218,3 +218,20 @@ With this knowledge, I'll be able to work smarter not harder in the future :)
 
 My example was lame and because of that I came up with the git bisect solution but now I see a lot
 of potential in this tool and I'm pretty sure it will save me some more time in the future.
+
+[.small]
+Source code can be found on https://github.com/pchudzik/blog-example-bisect-dragon[my github]
+
+[.small]
+If you've never used git bisect I encourage you to run the samples on your own:
+{{<highlight text>}}
+git clone https://github.com/pchudzik/blog-example-bisect-dragon.git
+cd blog-example-bisect-dragon
+(cd corporate && mvn -f pom-v1.xml install && mvn -f pom-v2.xml install) # or run ./setup.sh
+git bisect start
+git bisect bad
+git bisect good 6fd3a3d
+git bisect run sh -c "(cd project && mvn versions:set -DgenerateBackupPoms=false -DnewVersion=1.0.0 && git checkout -- .)"
+rm -rf $HOME/.m2/repository/com/pchudzik/blog/example/corporate-dragon # or run ./cleanup.sh
+{{</highlight>}}
+You'd be amazed how easy it is to locate the issue using this tool.
