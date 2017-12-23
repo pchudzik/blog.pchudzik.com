@@ -99,7 +99,7 @@ org.codehaus.mojo:versions-maven-plugin:2.3:set failed.: EmptyStackException -> 
 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
 {{</highlight>}}
 
-Ok it failed let's tell git about it:
+Ok it has failed let's tell git about it:
 
 {{<highlight text>}}
 pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ g bisect bad
@@ -113,7 +113,7 @@ Let's check again:
 pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
 {{</highlight>}}
 
-It has passed. Ok let's clean up and let git know that it is working now:
+It is ok. Let's clean up and let git know that it is working now:
 
 {{<highlight text>}}
 pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ git clean -f && git checkout -- .
@@ -123,7 +123,7 @@ Bisecting: 1 revision left to test after this (roughly 1 step)
 [85c13b67b5f41a0beb42c8d44040739497b6584b] added support for java 8
 {{</highlight>}}
 
-Now all I have to do is to run the procedure unit git will tell us which commit caused the problem
+Now all I have to do is to run the procedure unit git will tell us which commit caused the problem.
 
 {{<highlight text>}}
 pawel@tet:~/Workspace/blog-examples/bisect-the-dragon$ (cd project/ && mvn -q versions:set -DnewVersion=1.0.0)
@@ -197,8 +197,8 @@ index d12fc44..2d09e6c 100644
 {{</highlight>}}
 
 Ok nothing interesting at first glance, but those systemPropertyVariables looks fishy, why do I need
-to configure MySQL for tests? Turn's out that colon is a forbidden character in this context. A
-pretty lame problem, but it has passed all previous (up to install) phases but version setting...
+to configure MySQL for tests? Turn's out that colon is a forbidden character in this context. Pretty
+lame problem, but it has passed all previous (up to install) phases but version setting...
 
 After finding out broken commit I've decided to read the manual of
 https://git-scm.com/docs/git-bisect[git bisect] and found out that I could've automated the whole
