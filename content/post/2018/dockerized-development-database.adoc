@@ -1,0 +1,146 @@
+---
+title: "Dockerized dev database"
+Tags: ["docker", "howto"]
+Categories: ["devops"]
+description: "Write your tests so you can trust them"
+date: "2018-01-09"
+---
+
+If because of reasons you have to run Maria/Postgres/Oracle on localhost for development and you
+often import database dumps into it you probably spend some time waiting for DB to be ready to use.
+In this post, I'm going to show you how you can automate the whole process and save some time doing
+it with docker.
+
+Lately, I've noticed that team spends a lot of time on dumping development database and restoring it
+on localhost. I hate waiting for those things and decided to do something about it. I created few
+scripts which load latest production database dump import the data into MariaDB and build docker
+image with this data inside. Once the image is created you can push it to the Docker registry. Now
+instead of waiting for the dump to complete/download and import the whole process is much faster and
+basically depends on your internet sped.
+
+First things first. As a base for this, I'm going to use official mariadb:10.x image. I'm going to
+skip database dump process because it will probably be completely different in your organization and
+I'll just assume that dump is already next to Dockerfile (but it shouldn't be any problem to
+download it during docker build :)). If you are using different database vendor you should be able
+to implement this idea in it as well :)
+
+We have to start with initializing MariaDB and importing data into it:
+
+{{<highlight bash "linenos=table">}}
+#!/usr/bin/env bash
+
+set -e
+
+DATADIR="/var/lib/mysql"
+
+mysql_install_db --datadir="$DATADIR" --rpm
+chown -R mysql:mysql $DATADIR
+
+gosu mysql mysqld&
+PID="$!"
+
+echo "Wiating for mysql to start"
+while ! mysqladmin ping --silent; do
+    sleep 0.5
+done
+echo "MySQL ready"
+
+mysql -e "GRANT ALL ON *.* TO root@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION"
+echo "User root created with password ${MYSQL_ROOT_PASSWORD}"
+
+mysql -e "CREATE DATABASE IF NOT EXISTS ${MYSQL_DATABASE}"
+echo "Database $MYSQL_DATABASE created"
+
+echo "Starting data import"
+tar -xzOf /mydb.sql.tar.gz | mysql "$MYSQL_DATABASE"
+rm /mydb.sql.tar.gz
+echo "MySQL data imported"
+
+mysqladmin shutdown
+wait "$PID"
+echo "MySQL process stopped"
+
+tar czvf default_mysql.tar.gz "$DATADIR"
+
+{{</highlight>}}
+
+[%hardbreaks]
+Going quickly through what's happening there:
+lines 7:17 initialize and start MySQL database
+lines 19:23 change root user password and create a database
+lines 25:28 import production data into MySQL instance
+line 30 stop MySQL instance
+line 34 archive of MySQL data dir
+
+Line 34 was a tricky one. /var/lib/mysql is docker's volume, therefore, all data stored inside this
+directory will be lost while doing docker run. I'm not docker ninja most of the time I just do
+docker start and docker stop ;) and it forced me to do me some digging. If you cannot do this trick
+make sure you've configured your database to store data outside of sharable volume.
+
+{{<highlight bash>}}
++ du -sh /var/lib/mysql
+325M /var/lib/mysql
++ du -sh default_mysql.tar.gz
+84M default_mysql.tar.gz
+{{</highlight>}}
+
+So with this, I'll be able to save some LTE transfer :)
+
+Now once we have everything populated we can write a script which will boot MySQL instance during
+docker run:
+
+{{<highlight bash>}}
+#!/usr/bin/env bash
+
+set -e
+
+if [ "$(ls -A /var/lib/mysql)" ]; then
+  echo "Running with existing database in /var/lib/mysql"
+else
+  echo 'Populate initial db';
+  tar xpzvf default_mysql.tar.gz
+fi
+
+gosu mysql mysqld
+
+{{</highlight>}}
+
+Nothing fancy here. If data is already present do nothing. If data is missing extract previously
+archived data and start MySQL instance.
+
+Finally, we'll need Dockerfile which will boundle it all together:
+
+{{<highlight docker>}}
+FROM mariadb:10.3.3
+
+ENV MYSQL_ROOT_PASSWORD root
+ENV MYSQL_DATABASE mydb
+EXPOSE 3306
+
+COPY mydb.sql.tar.gz /
+COPY initialize.sh /
+COPY startup.sh /
+
+RUN /initialize.sh
+
+ENTRYPOINT ["/startup.sh"]
+
+{{</highlight>}}
+
+And that's all.
+
+Of course, you'll probably want to push this image somewhere (see
+https://github.com/pchudzik/blog-example-dockerized-development-database[README.md] on instructions
+how to push this to registry running on localhost) or check out
+https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html[AWS docs] on this
+topic.
+
+With this, you can quickly restore QA environment to retest things.
+
+If you have some sensitive data in your database it will be a great entry point to replace sensitive
+data with whatever (or simply remove it). You probably already have some automated process which
+does production database backup. With DB backup and scheduled Jenkins job you'll be able to have the
+latest data available in docker registry. With this restoring database after making mistake in DB
+migration script will be easier - instead of manually reverting changes or waiting for reimport, you
+can remove and start the container. Reproducing bugs with production like data should also be a bit
+easier :) It is nothing fancy here but it has potential to save you some time.
