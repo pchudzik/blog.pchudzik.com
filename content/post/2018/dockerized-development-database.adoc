@@ -11,12 +11,14 @@ often import database dumps into it you probably spend some time waiting for DB 
 In this post, I'm going to show you how you can automate the whole process and save some time doing
 it with docker.
 
+<!--more-->
+
 Lately, I've noticed that team spends a lot of time on dumping development database and restoring it
 on localhost. I hate waiting for those things and decided to do something about it. I created few
-scripts which load latest production database dump import the data into MariaDB and build docker
-image with this data inside. Once the image is created you can push it to the Docker registry. Now
-instead of waiting for the dump to complete/download and import the whole process is much faster and
-basically depends on your internet sped.
+scripts which load latest production database dump into MariaDB and build docker image with this
+data inside. Once the image is created you can push it to the Docker registry. Now instead of
+waiting for the dump to complete/download and import the whole process is much faster and basically
+depends on your internet speed.
 
 First things first. As a base for this, I'm going to use official mariadb:10.x image. I'm going to
 skip database dump process because it will probably be completely different in your organization and
@@ -72,9 +74,9 @@ lines 25:28 import production data into MySQL instance
 line 30 stop MySQL instance
 line 34 archive of MySQL data dir
 
-Line 34 was a tricky one. /var/lib/mysql is docker's volume, therefore, all data stored inside this
-directory will be lost while doing docker run. I'm not docker ninja most of the time I just do
-docker start and docker stop ;) and it forced me to do me some digging. If you cannot do this trick
+Line 34 was a tricky one. /var/lib/mysql is a docker's volume, therefore, all data stored inside
+this directory will be lost while doing docker run. I'm not docker ninja and most of the time I just
+do docker start and docker stop ;) It forced me to do me some digging. If you cannot do this trick
 make sure you've configured your database to store data outside of sharable volume.
 
 {{<highlight bash>}}
@@ -86,7 +88,7 @@ make sure you've configured your database to store data outside of sharable volu
 
 So with this, I'll be able to save some LTE transfer :)
 
-Now once we have everything populated we can write a script which will boot MySQL instance during
+Now once we have database populated we can write a script which will boot MySQL instance during
 docker run:
 
 {{<highlight bash>}}
@@ -140,7 +142,7 @@ With this, you can quickly restore QA environment to retest things.
 If you have some sensitive data in your database it will be a great entry point to replace sensitive
 data with whatever (or simply remove it). You probably already have some automated process which
 does production database backup. With DB backup and scheduled Jenkins job you'll be able to have the
-latest data available in docker registry. With this restoring database after making mistake in DB
-migration script will be easier - instead of manually reverting changes or waiting for reimport, you
-can remove and start the container. Reproducing bugs with production like data should also be a bit
-easier :) It is nothing fancy here but it has potential to save you some time.
+latest data available in docker registry. With this restoring database after making mistake in
+flyway's migration script will be easier - instead of manually reverting changes or waiting for
+reimport, you can remove and start the container. Reproducing bugs with production like data should
+also be a bit easier :) It is nothing fancy here but it has potential to save you some time.
