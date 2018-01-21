@@ -1,0 +1,220 @@
+---
+title: "From express and pug to HTML"
+Tags: ["howto", "interesting", "npm"]
+Categories: ["javascript"]
+description: "Write your tests so you can trust them"
+date: "2018-01-23"
+---
+
+While working on private stuff I've encountered a moment when I was in need to create a web-based
+user interface for the application I've been developing lately. In this post, I'm going to briefly
+describe why I've decided to use nodejs for generating HTML on the server side and how I've taken
+advantage of the javascript on the server and in the browser.
+
+<!--more-->
+
+Once my backend API was more or less in place I've decided it is time to do something about the UI.
+I've started from evaluating possible options. Let me give you some context. I need a web interface
+for something that might die and I don't want to spent too much time on this. On the other hand, if
+it gets lit I'll have to maintain it for some time or at least before I rewrite it to something less
+hacky :)
+
+I've quickly dropped the idea to create rich web client using angular or react because it is a lot
+of work to create a solid application using those technologies. I think react and angular are great
+solutions for creating web applications, but I don't really need full-blown app right now. Going
+this way you are basically forced to always chase the technology and it will always be ahead of you
+;) What's more although angular is developed by company which started from creating search engine it
+is not indexed very good by the Google (sure you can work around this problem, but I'm not ready to
+spend too much time on this) neither is react.
+
+My second idea was to use java/groovy (basically everything from JSF, wicket, GWT (isn't it dead
+yet?) to more static template based stuff). I don't like the idea of writing frontend in the backend
+language. What's more java and groovy are far from perfect for prototyping because you have to write
+a lot of code to do simple stuff (groovy is actually ok, but I think there are better options).
+
+I could've used ruby/python/whatever to generate HTML. Same as with java backend language for
+generating frontend code doesn't sound right for me. What's more, I barely know python, I don't know
+ruby and "whatever" is really hard to define ;) It might be nice to learn something new along the
+way but I don't want to learn a new language while doing stuff that I no longer enjoy doing.
+
+Finally, I've decided to use nodejs along with expressjs and piugjs template engine. Nodejs is
+javascript and browsers do like javascript :) From my previous experiences nodejs is great
+prototyping tool.
+
+[.center-image]
+image::/post/2018/express-pug/pug.jpeg[The Pug]
+
+While I was hacking quick POC I decided to try and implement yet another crazy idea. Sometimes full
+page reload doesn't make a lot of sense especially when you are adding an item to the list of items.
+Since I was using javascript on the backend and javascript in the browser I've decided to use the
+same template on the frontend and on the backend. After quick research, I was able to do it and use
+exactly the same template for generating UI on the client and server side :)
+
+I've seen my share of ${}, {{}} or another weird syntax which allows mixing HTML with something else
+I wanted to try something new. The library I decided to use is named pugjs it has a tool called
+pug-cli which compiles templates to the pure javascript functions which can be included and invoked
+in the browser. You probably already know where I'm going with this. I created small reusable
+templates and with them, I was able to quickly generate HTML in the backend and use the same
+template to do some ajax on the client side without duplicating layout code in the client javascript
+:)
+
+Let me show how ugly it is ;) I've created a simple application using an express generator. Note
+that it generates old fashion javascript and you can safely use a lot of sugar from es6 in node8.
+
+{{<highlight bash>}}
+npm install express-generator && cd sample
+./node_modules/.bin/express --view pug --css sass --git sample
+{{</highlight>}}
+
+I quickly hacked API which allows to list, add and remove "users":
+
+{{<highlight javascript>}}
+const
+  express = require('express'),
+  router = express.Router();
+
+router.get('/', (req, res) => { /* ... */ });
+router.get('/:id', (req, res) => { /* ... */ });
+router.post('/', (req, res) => { /* ... */ });
+router.delete('/:id', (req, res) => { /* ... */ });
+router.put('/:id', (req, res) => { /* ... */ });
+
+module.exports = router;
+{{</highlight>}}
+[.small]
+https://github.com/pchudzik/blog-example-express-pug/blob/master/routes/usersApi.js
+
+Next, I've created two endpoints to list all users and display details of a single user:
+
+{{<highlight javascript>}}
+
+const
+  express = require('express'),
+  router = express.Router(),
+  axios = require('axios');
+
+router.get('/', function (req, res) {
+  axios
+    .get('http://localhost:3000/api/users')
+    .then(unwrapResponseData)
+    .then(users => res.render('users', {users: users}));
+});
+
+router.get('/:id', (req, res) => {
+  axios
+    .get('http://localhost:3000/api/users/' + req.params.id)
+    .then(unwrapResponseData)
+    .then(user => res.render('userDetails', {user}));
+});
+
+function unwrapResponseData(response) {
+  return response.data;
+}
+
+module.exports = router;
+{{</highlight>}}
+
+Now it is time to do write templates for this stuff. First, let's list all users and add an option
+to create user and button to remove a particular resource from the list without doing page reload:
+
+{{<highlight jade>}}
+extends layout
+
+block content
+  h1 users list
+
+  include userCreateForm
+
+  ul#allUsers
+    each user in users
+      include singleUser
+{{</highlight>}}
+
+Note that pug/jade is very compact, and name suggest exactly what to expect from it :P Let's take a
+look at singleUser.pug which will be included for each user entry:
+
+{{<highlight jade>}}
+li.userItem(id='user' + user.id)
+  a(href='/users/' + user.id)
+    span.id= user.id
+    =" "
+    span.firstName= user.firstName
+    =" "
+    span.lastName= user.lastName
+  input(type='button', value='Delete user', id='user' + user.id + 'Remove')
+
+  script.
+    $('#user#{user.id}Remove').click(function () {
+      $.ajax({
+        url: 'http://localhost:3000/api/users/#{user.id}',
+        type: 'DELETE',
+        success: function () {
+          $('#user#{user.id}').remove();
+        }
+      });
+    });
+{{</highlight>}}
+
+Nothing fancy list username, and add a button to remove the user. Now create user form which is a
+bit more interesting:
+
+{{<highlight jade>}}
+form#userCreateForm
+  p
+    | User first name
+    input#userFirstName(type='text')
+  p
+    | User last name
+    input#userLastName(type='text')
+  p
+    input#userSave(type='submit', value='Save')
+
+script(src='javascripts/views/singleUser.js')
+script.
+  $(document).ready(function () {
+    $('#userCreateForm').submit(function () {
+      $.post(
+        'http://localhost:3000/api/users',
+        {
+          firstName: $('#userFirstName').val(),
+          lastName: $('#userLastName').val()
+        },
+        function (response) {
+          $('#allUsers').append(singleuserTemplate({user: response}));
+        });
+    });
+  });
+{{</highlight>}}
+
+The javascript included in this file is the core of the idea :) it is executing post request and
+passes the response back to the singleUser template. I don't need to duplicate information how
+single user HTML looks like. I can easily reuse the same template which was used on the server side
+to quickly generate the same HTML on the client side. Sure there are drawbacks and restrictions, but
+I believe that with a bit of a planning it might actually work.
+
+I was able to achieve it using pug.js and updating package.json scripts section a bit:
+
+{{<highlight json>}}
+{
+  "scripts": {
+    "start": "pug -c --name-after-file -o public/javascripts/views views && node ./bin/www",
+    "dev": "concurrently -k \"nodemon ./bin/www\" \"pug -c -w --name-after-file -o public/javascripts/views views\""
+  },
+}
+{{</highlight>}}
+
+Note that package.json is only basic example. In real life you'd probably want to merge multiple
+templates into single file and add other stuff which will speed up build process.
+
+Since I'm barely starting I don't know how it will work in the future but I'm pretty sure that I'll
+be able to hack something working using this approach really fast. I wouldn't recommend this for big
+applications but it is something which will allow to prototype UI quickly. To avoid dropping
+everything I did in the future I'm going to write integration tests which I'll be able to reuse in
+the future in case I'll have to rewrite it to something more civilized ;)
+
+[.small]
+--
+Image credits:
+
+* https://www.pexels.com/photo/adorable-animal-breed-canine-374906/
+--
