@@ -1,6 +1,6 @@
 ---
 title: "From express and pug to HTML"
-Tags: ["howto", "interesting", "npm"]
+Tags: ["howto", "interesting", "node"]
 Categories: ["javascript"]
 description: "Write your tests so you can trust them"
 date: "2018-01-23"
