@@ -20,11 +20,11 @@ hand, if it gets lit I'll have to maintain it for some time or at least before I
 something less hacky :)
 
 I've quickly dropped the idea of creating rich web client using angular or react because it is a lot
-of work to create a solid application using modern js those technologies. I think react and angular
-are great solutions for creating web applications, but I don't really need full-blown app right now.
-Starting with angular/react basically means that you are forced to always chase the technology and
-it will always be ahead of you ;) What's more although angular is developed by company which started
-from creating search engine it is not indexed very good by the Google (sure you can work around this
+of work to create a solid application using those technologies. I think react and angular are great
+solutions for creating web applications, but I don't really need full-blown app right now. Starting
+with angular/react basically means that you are forced to always chase the technology and it will
+always be ahead of you ;) What's more although angular is developed by company which started from
+creating search engine it is not indexed very good by the Google (sure you can work around this
 problem, but I'm not ready to spend too much time on creating workarounds for the system that does
 not exists yet) neither is react.
 
@@ -40,8 +40,8 @@ the way but I don't want to learn a new language while doing stuff that I no lon
 
 Finally, I've decided to use https://nodejs.org/en/[Node.js] along with
 https://expressjs.com/[Express.js] and https://pugjs.org[pug.js] template engine. Node.js is
-javascript and browsers do like javascript :) From my previous experiences node is great prototyping
-tool.
+javascript and browsers do like javascript :) From my previous experiences node is actually great
+prototyping tool and gets the job done pretty fast.
 
 [.center-image]
 image::/post/2018/express-pug/pug.jpeg[The Pug]
@@ -58,7 +58,7 @@ https://github.com/pugjs/pug-cli[pug-cli] which compiles templates to the pure j
 which can be included and invoked in the browser. You probably already know where I'm going with
 this. I created small reusable templates and with them, I was able to quickly generate HTML in the
 backend and use the same template to do some ajax on the client side without duplicating layout code
-in the client javascript :)
+on the client side :)
 
 Let me show how ugly it is ;) I've created a simple application using an express generator. Note
 that it generates old fashion javascript and you can safely use a lot of sugar from es6 in node8.
@@ -208,11 +208,12 @@ I was able to achieve it using pug.js and updating package.json scripts section 
 Note that package.json is only basic example. In real life you'd probably want to merge multiple
 templates into single file and add other stuff which will speed up build process.
 
-Since I'm barely starting I don't know how it will work in the future but I'm pretty sure that I'll
-be able to hack something working using this approach really fast. I wouldn't recommend this for big
+I'm barely starting and I don't know how it will work in the future but I'm pretty sure that I'll be
+able to hack something working using this approach really fast. I wouldn't recommend this for big
 applications but it is something which will allow to prototype UI quickly. To avoid dropping
-everything I did in the future I'm going to write integration tests which I'll be able to reuse no
-matter how UI stack will look like in case I'll have to rewrite it to something more civilized ;)
+everything I did in the future I'm going to write integration tests which I'll be able to reuse, no
+matter how UI technology stack will look like, in case I'll have to rewrite it to something more
+civilized ;)
 
 [.small]
 --
