@@ -9,14 +9,14 @@ date: "2018-01-23"
 While working on private stuff I've encountered a moment when I was in need to create a web-based
 user interface for the application I've been developing lately. In this post, I'm going to briefly
 describe why I've decided to use Node.js for generating HTML on the server side and how I've taken
-advantage of the javascript on the server and in the browser.
+advantage of the javascript on the server side and in the browser.
 
 <!--more-->
 
 Once my backend API was more or less in place I've decided it is time to do something about the user
 interface. I've started from evaluating possible options. Let me give you some context. I need a web
 interface for something that might die and I don't want to spent too much time on this. On the other
-hand, if it gets lit I'll have to maintain it for some time or at least before I rewrite it to
+hand, if it gets lit I'll have to maintain it for some time, or at least before I rewrite it to
 something less hacky :)
 
 I've quickly dropped the idea of creating rich web client using angular or react because it is a lot
@@ -116,8 +116,7 @@ function unwrapResponseData(response) {
 module.exports = router;
 {{</highlight>}}
 
-Now it is time to do write templates for this stuff. First, let's list all users and add an option
-to create user and button to remove a particular resource from the list without doing page reload:
+Now it is time to write templates for this stuff. Lets do CRD (no Update :)) for the users:
 
 {{<highlight jade>}}
 extends layout
@@ -212,8 +211,8 @@ I'm barely starting and I don't know how it will work in the future but I'm pret
 able to hack something working using this approach really fast. I wouldn't recommend this for big
 applications but it is something which will allow to prototype UI quickly. To avoid dropping
 everything I did in the future I'm going to write integration tests which I'll be able to reuse, no
-matter how UI technology stack will look like, in case I'll have to rewrite it to something more
-civilized ;)
+matter how UI technology stack will look like. Just in case I'll have to rewrite it to something
+more civilized ;)
 
 [.small]
 --
