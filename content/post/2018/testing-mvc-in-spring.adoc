@@ -1,0 +1,204 @@
+---
+title: "Testing MVC in Spring"
+Tags: ["tdd", "testing", "spock", "howto", "spring"]
+Categories: ["java"]
+description: "Recipes for testing MVC in Spring"
+date: "2018-01-30"
+---
+
+
+Most of java web applications is built on top of the Spring Framework. Spring has pretty good
+support for testing and it is a mistake not to take advantage of features it offers. I've been
+developing various applications using Spring MVC for some time and I've noticed few patterns for
+testing that do work.
+
+<!--more-->
+
+[.lead]
+tl;dr
+
+- Do write tests for controllers
+- Put MVC tests in separate test group
+- Setup smallest context possible
+- Not everything is included in
+  https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTest.html[@WebMvcTest]
+- Be as strict as possible while writing MVC tests
+- Groovy or kotlin (languages with multiline string support) are very good choice to write clean
+  json verifications
+
+
+[.lead]
+Why you should write test for API
+
+If you are writing applications which expose some REST API. Endpoints become your public interface.
+From my experience testing public API is always a good idea. In long term, it will save you a lot of
+ping-pong with frontend guys when you unintentionally change the contract. What is more JSON
+serialization and deserialization can get out of hand fast especially if for some reason you decided
+to use the same objects in multiple endpoints. Clean MVC tests can be used as pretty good examples
+for other people on how to use your API and what to expect from it. Sure you can do a lot with
+swagger but will you bother to customize it for an in-house solution? With API tests you are
+creating documentation of your API and you'll have guarantee that your build will not pass when
+documentation will get outdated. Note that MVC tests in spring are not so fast and you should put
+them in separate test group to ensure that developers actually run some tests on localhost :)
+
+
+[.lead]
+Test context
+
+Spring ships with a bunch of built-in annotations which will save you a lot of time while writing
+API tests. You have basically two options for setting up context for tests. You can start full
+context which will push the request from the top to the bottom
+(https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/context/SpringBootTest.html[@SpringBootTest]
+with https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/AutoConfigureMockMvc.html[@AutoConfigureMockMvc]). If you want to focus on testing MVC layer and don't want to start a
+database to verify if your API works (I prefer to test database layer separately and more
+thoroughly) you should use
+https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTest.html[@WebMvcTest]
+which will bootstrap small context with a selected controller(s) in it.
+
+While testing with the full context you save yourself some context recreating but you can write more
+detailed test when verifying one controller at a time. You can easily mock everything below rest
+controller. Setting up the context with one controller and service or two will be faster (in
+long-term) then booting up whole application and replacing single bean each time you test a
+controller (think about a number of controllers and amount of tests you will write). While writing
+tests for the single controller you should be aware that not everything will be included in a test
+context. Things that are included by default:
+
+- https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/bind/annotation/ControllerAdvice.html[org.springframework.web.bind.annotation.ControllerAdvice]
+- https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/jackson/JsonComponent.html[org.springframework.boot.jackson.JsonComponent]
+- https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/servlet/config/annotation/WebMvcConfigurer.html[org.springframework.web.servlet.config.annotation.WebMvcConfigurer]
+- https://docs.oracle.com/javaee/6/api/javax/servlet/Filter.html[javax.servlet.Filter]
+- https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/web/servlet/FilterRegistrationBean.html[org.springframework.boot.web.servlet.FilterRegistrationBean]
+- https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/web/servlet/DelegatingFilterProxyRegistrationBean.html[org.springframework.boot.web.servlet.DelegatingFilterProxyRegistrationBean]
+- https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/method/support/HandlerMethodArgumentResolver.html[org.springframework.web.method.support.HandlerMethodArgumentResolver]
+- https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/http/converter/HttpMessageConverter.html[org.springframework.http.converter.HttpMessageConverter]
+- https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/autoconfigure/web/ErrorAttributes.html[org.springframework.boot.autoconfigure.web.ErrorAttributes]
+- https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/stereotype/Controller.html[org.springframework.stereotype.Controller]
+
+Those checks include annotations inheritance -
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/bind/annotation/RestController.html[@RestController]
+will be included because it is a
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/stereotype/Controller.html[@Controller].
+Everything else will be ignored and to provide service or repository you'll have to set it up by
+yourself or inject mock.
+
+
+[.lead]
+Basic testing utilities included in spring-test
+
+spring-test package ships with some built-in functionalities to test JSON. The entry point for all
+of those verifications will be static method
+https://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/test/web/servlet/result/MockMvcResultMatchers.html#jsonPath-java.lang.String-org.hamcrest.Matcher-[jsonPath()].
+Detailed instructions on how to construct path you'll find on
+https://github.com/json-path/JsonPath[jsonPath homepage] you can also
+http://jsonpath.herokuapp.com/[play around] with paths. You can compare values directly through
+value() method, but be aware that if you are using matchers to compare objects actual values will be
+converted to Map so in this case you'll have to create the map to actually verify all fields.
+
+{{<highlight groovy>}}
+@Test
+def "should handle IllegalStateException"() {
+  given:
+  final message = "Message text"
+  final uuid = UUID.randomUUID()
+  
+  and:
+  idGenerator.generateId() >> uuid
+  
+  when:
+  final request = mvc
+    .perform(MockMvcRequestBuilders.post("/exceptions")
+    .param("message", message)
+    .param("exceptionClass", IllegalStateException.class.name))
+  
+  then:
+  request
+    .andExpect(status().isBadRequest())
+  
+    .andExpect(jsonPath('$').value([
+      "message": message,
+      "uuid": uuid.toString()
+    ]))
+  
+    .andExpect(jsonPath('$.message').value(message))
+    .andExpect(jsonPath('$.uuid').value(uuid.toString()))
+}
+
+@RestController
+@RequestMapping("/exceptions")
+static class ExceptionThrowingController {
+  @PostMapping
+  def throwException(@RequestParam String message, @RequestParam Class<? extends Exception> exceptionClass) {
+    throw exceptionClass.newInstance(message)
+  }
+}
+{{</highlight>}}
+[.small]
+https://github.com/pchudzik/blog-example-spring-mvc-test/blob/master/src/test/groovy/com/pchudzik/blog/example/mvctest/MvcExceptionHandlerTest.groovy
+
+[.lead]
+More detailed JSON verifications
+
+I am usually very strict to what can be returned from an API and what to expect from it. To check
+JSON I use https://github.com/skyscreamer/JSONassert[JSONAssert library] which allows to easily
+compare JSON and will display detailed report when there are errors.
+
+{{<highlight groovy>}}
+def "should return all articles"() {
+  given:
+  final firstArticle = new ArticleDto(UUID.randomUUID(), "article 1", "article 1 content")
+  final secondArticle = new ArticleDto(UUID.randomUUID(), "article 2", "article 2 content")
+
+  and:
+  articleService.findAll() >> [firstArticle, secondArticle]
+
+  when:
+  final request = mockMvc.perform(get("/articles"))
+
+  then:
+  request.andExpect(jsonEqualTo("""[{
+      uuid: "${firstArticle.uuid}",
+      title: "${firstArticle.title}",
+      intro: "${firstArticle.intro}"
+    },{
+      uuid: "${secondArticle.uuid}",
+      title: "${secondArticle.title}",
+      intro: "${secondArticle.intro}"
+    }]"""))
+}
+
+private static ResultMatcher jsonEqualTo(String expected) {
+  return new ResultMatcher() {
+    @Override
+    void match(MvcResult result) throws Exception {
+      final actual = result.response.contentAsString
+      JSONAssert.assertEquals(
+          expected,
+          actual,
+          JSONCompareMode.STRICT)
+    }
+  }
+}
+{{</highlight>}}
+
+[.small] https://github.com/pchudzik/blog-example-spring-mvc-test/blob/master/src/test/groovy/com/pchudzik/blog/example/mvctest/ArticleControllerTest.groovy
+
+From one side it has the drawback - you have to write JSON to compare it, on the other side once you
+notice one screen of JSON you might realize that your API is getting too big and maybe it returns too
+much information at once.
+
+When using JSONAssert you have some
+http://jsonassert.skyscreamer.org/apidocs/org/skyscreamer/jsonassert/JSONCompareMode.html[options on
+how to do comparison].
+
+Note that because I use groovy for JSON comparison those JSONs are actually readable and
+straightforward to understand. I strongly encourage you to use groovy or kotlin to write mvc tests
+:)
+
+
+[.lead]
+Summary
+
+Writing tests for an API in spring is very simple and it is a shame if you are not doing it. You
+have so many options to write tests that will fit your needs and you should be kind to your future
+self and other team members and create solid tests which will abort the build when the contract is
+broken.
