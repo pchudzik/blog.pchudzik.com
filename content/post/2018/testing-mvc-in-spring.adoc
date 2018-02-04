@@ -30,36 +30,37 @@ tl;dr
 [.lead]
 Why you should write test for API
 
-If you are writing applications which expose some REST API. Endpoints become your public interface.
-From my experience testing public API is always a good idea. In long term, it will save you a lot of
-ping-pong with frontend guys when you unintentionally change the contract. What is more JSON
-serialization and deserialization can get out of hand fast especially if for some reason you decided
-to use the same objects in multiple endpoints. Clean MVC tests can be used as pretty good examples
-for other people on how to use your API and what to expect from it. Sure you can do a lot with
-swagger but will you bother to customize it for an in-house solution? With API tests you are
-creating documentation of your API and you'll have guarantee that your build will not pass when
-documentation will get outdated. Note that MVC tests in spring are not so fast and you should put
-them in separate test group to ensure that developers actually run some tests on localhost :)
+If you are writing applications which expose some REST API then those endpoints become your public
+interface. From my experience testing public API is always a good idea. In long term, it will save
+you a lot of ping-pong with frontend guys when you unintentionally change the contract. What is more
+JSON serialization and deserialization can get out of hand really fast especially if for some reason
+you decided to use the same objects in multiple endpoints. Clean MVC tests can be used as pretty
+good examples for other people on how to use your API and what to expect from it. Sure you can do a
+lot with swagger but will you bother to customize it for an in-house solution? With API tests you
+are creating documentation of your API and you have guarantee that your build will not pass when
+documentation is outdated. Note that MVC tests in spring are not so fast and you should put them in
+separate test group to ensure that developers run some tests on localhost :)
 
 
 [.lead]
 Test context
 
 Spring ships with a bunch of built-in annotations which will save you a lot of time while writing
-API tests. You have basically two options for setting up context for tests. You can start full
-context which will push the request from the top to the bottom
+API tests. While writing MVC tests you have basically two options for setting up test context. You
+can start full context which will push the request from the top to the bottom
 (https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/context/SpringBootTest.html[@SpringBootTest]
-with https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/AutoConfigureMockMvc.html[@AutoConfigureMockMvc]). If you want to focus on testing MVC layer and don't want to start a
-database to verify if your API works (I prefer to test database layer separately and more
-thoroughly) you should use
+and
+https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/AutoConfigureMockMvc.html[@AutoConfigureMockMvc]).
+If you want to focus on testing MVC layer and don't want to start a database to verify if your API
+works (I prefer to test database layer separately and more thoroughly) you should use
 https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/servlet/WebMvcTest.html[@WebMvcTest]
 which will bootstrap small context with a selected controller(s) in it.
 
 While testing with the full context you save yourself some context recreating but you can write more
 detailed test when verifying one controller at a time. You can easily mock everything below rest
 controller. Setting up the context with one controller and service or two will be faster (in
-long-term) then booting up whole application and replacing single bean each time you test a
-controller (think about a number of controllers and amount of tests you will write). While writing
+long-term) than booting up whole application and replacing single bean each time you run test
+scenario (think about a number of controllers and amount of tests you will write). While writing
 tests for the single controller you should be aware that not everything will be included in a test
 context. Things that are included by default:
 
@@ -182,23 +183,22 @@ private static ResultMatcher jsonEqualTo(String expected) {
 
 [.small] https://github.com/pchudzik/blog-example-spring-mvc-test/blob/master/src/test/groovy/com/pchudzik/blog/example/mvctest/ArticleControllerTest.groovy
 
-From one side it has the drawback - you have to write JSON to compare it, on the other side once you
-notice one screen of JSON you might realize that your API is getting too big and maybe it returns too
-much information at once.
+From one side it has the drawback - you have to write JSON to compare it, on the other hand once you
+notice one screen of JSON you might realize that your API is getting too big and maybe it returns
+too much information at once.
 
 When using JSONAssert you have some
 http://jsonassert.skyscreamer.org/apidocs/org/skyscreamer/jsonassert/JSONCompareMode.html[options on
 how to do comparison].
 
-Note that because I use groovy for JSON comparison those JSONs are actually readable and
-straightforward to understand. I strongly encourage you to use groovy or kotlin to write mvc tests
-:)
+Note that because I use groovy for JSON comparison those strings are actually readable and pretty
+easy to understand. I strongly encourage you to use groovy or kotlin to write mvc tests :)
 
 
 [.lead]
 Summary
 
 Writing tests for an API in spring is very simple and it is a shame if you are not doing it. You
-have so many options to write tests that will fit your needs and you should be kind to your future
-self and other team members and create solid tests which will abort the build when the contract is
+have so many options to write tests that will fit your needs. You should be nice to your future self
+and other team members and create solid tests which will abort the build when the contract is
 broken.
