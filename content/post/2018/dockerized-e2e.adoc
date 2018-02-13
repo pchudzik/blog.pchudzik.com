@@ -1,0 +1,274 @@
+---
+title: "Dockerized e2e tests"
+Tags: ["docker", "node", "howto"]
+Categories: ["javascript"]
+description: "Dockerized e2e tests"
+date: "2018-02-15"
+---
+
+In my free time, I'm trying to learn something new and best of way learning is by doing. To avoid
+spinning my wheels in vain I'm helping to develop some product. In the
+https://blog.pchudzik.com/201801/express-pug/[previous post], I've described what we've decided to
+use for the UI and pointed out that I'm going to write integration tests. Here is how I integrated
+selenium e2e tests with gitlab-ci/travis-ci/whatever and run them in docker.
+
+
+I don't like either writing nor maintaining end to end tests and because of this, my approach is to
+write as little as possible of those. One might want to ask why do you write them at all? Well, the
+reason is that I'm aiming for continuous delivery and I'd prefer to know if a bunch of services I'm
+going to write will work together just fine. We are not creating another google where we can do
+canary release and do the tests on production because our potential 3 users might not be so happy
+about it :) That is why I'd like to write e2e tests which will cover critical functionalities of the
+system.
+
+I'm aware that e2e tests don't have
+https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html[good press] and
+people don't
+https://www.continuousdeliveryconsulting.com/blog/end-to-end-testing-considered-harmful/[like them].
+I'm not going to create ice cream cone and I'd like to have feedback as fast as possible.
+
+[.center-image]
+image::https://www.continuousdeliveryconsulting.com/wp-content/uploads/2015/11/End-To-End-Testing-Considered-Harmful-Labelled-Test-Ice-Cream-Cone.png[The Pug]
+[.small]
+https://www.continuousdeliveryconsulting.com/blog/end-to-end-testing-considered-harmful/
+
+
+I'm not making my living by writing tests but from I've heard selenium is still the best tool for
+the job and I've started with it. Then I've stumbled upon http://webdriver.io/[webdriver.io] and it
+looks pretty good at first glance. Now when my basics were covered it was time to work on fast
+feedback loop and integrate it into our CI tool.
+
+[.small]
+For the purpose of this post, I've ported this to travis-ci and it shouldn't be a problem
+to implement using different CI tools (for example jenkins or whatever).
+
+First things first. We are living in the containers era now and my first step was to see what I can
+find on hub.docker.com. I've found some useful stuff which saved me a lot of time:
+https://hub.docker.com/r/selenium/hub/[selenium/hub],
+https://hub.docker.com/r/selenium/node-chrome/[selenium/node-chrome],
+https://hub.docker.com/r/selenium/node-firefox/[selenium/node-firefox]. With those containers, all
+of the heavy lifting is already done ;) and I was able to focus on putting it all to work.
+
+For the purposes of this blog post, I'm going to write few tests for famous
+http://todomvc.com/examples/react/[todo MVC app]
+
+I've started with wdio setup:
+
+{{<highlight bash>}}
+./node_modules/.bin/wdio config
+{{</highlight>}}
+
+And then just answered few questions :)
+
+Next, I've written my first Page Object and 3 tests to have something to work with:
+
+[.small]
+https://github.com/pchudzik/blog-example-e2e-tests/blob/master/test/Todo.page.js
+{{<highlight javascript>}}
+const itemSelector = index => `.todo-list li:nth-child(${index + 1})`;
+
+class TodoPage {
+  open() {
+    browser.reload();
+    browser.url('/');
+    browser.waitUntil(
+      () => browser.isVisible('.new-todo'),
+      2000,
+    );
+  }
+
+  addNewItem(todo) {
+    browser.setValue('.new-todo', `${todo}\uE006`);
+  }
+
+  gettodoText(index) {
+    return $(itemSelector(index)).getText();
+  }
+
+  get itemsCount() {
+    if (!($('.todo-list').isVisible())) {
+      return 0;
+    }
+
+    return browser.elements('.todo-list li').value.length;
+  }
+
+  get itemsCounterValue() {
+    return parseInt($('.todo-count strong').getText(), 10);
+  }
+
+  get title() {
+    return browser.getTitle();
+  }
+}
+
+export default new TodoPage();
+{{</highlight>}}
+
+[.small]
+https://github.com/pchudzik/blog-example-e2e-tests/blob/master/test/todoPage.spec1.js
+{{<highlight javascript>}}
+import { expect } from 'chai';
+import todoPage from './Todo.page';
+
+describe('spec1', () => {
+  it('should open todo app main page', () => {
+    // when
+    todoPage.open();
+
+    // then
+    expect(todoPage.title).to.equal('React • TodoMVC');
+  });
+});
+{{</highlight>}}
+
+[.small]
+https://github.com/pchudzik/blog-example-e2e-tests/blob/master/test/todoPage.spec2.js
+
+{{<highlight javascript>}}
+import { expect } from 'chai';
+import todoPage from './Todo.page';
+
+describe('spec2', () => {
+  beforeEach(() => {
+    todoPage.open();
+  });
+
+  it('should add new item to list', () => {
+    // given
+    const todoItemText = 'new item';
+
+    // when
+    todoPage.addNewItem(todoItemText);
+
+    // then
+    expect(todoPage.gettodoText(0)).to.equal(todoItemText);
+    expect(todoPage.itemsCount).to.eql(1);
+  });
+
+  it('should display valid items count', () => {
+    // when
+    todoPage.addNewItem('first');
+    todoPage.addNewItem('second');
+
+    // then
+    expect(todoPage.itemsCounterValue).to.eql(2);
+  });
+});
+{{</highlight>}}
+
+I've split tests intentionally for the purposes of the demo. When running tests from multiple files
+wdio will create up to maxInstances of each browser which should speed up the testing process..
+
+The last step was to dockerize todo application (in real life example I was running those tests
+after deployment on ECS was finished, as a part of the continuous delivery pipeline) -
+https://github.com/pchudzik/blog-example-e2e-tests/blob/master/app/Dockerfile[Dockerfile].
+
+For easier local development I've created docker-compose which allows me to boot up application,
+selenium and browsers in docker, and run the tests from host machine:
+
+{{<highlight text>}}
+version: '3'
+
+services:
+  selenium:
+    image: selenium/hub:3.8.1
+    ports:
+      - 4444:4444
+
+  chrome:
+    image: selenium/node-chrome:3.8.1
+    depends_on:
+      - selenium
+    volumes:
+      - /dev/shm:/dev/shm
+    environment:
+      - HUB_HOST=selenium
+      - HUB_PORT=4444
+
+  firefox:
+    image: selenium/node-firefox:3.8.1
+    depends_on:
+      - selenium
+    volumes:
+      - /dev/shm:/dev/shm
+    environment:
+    - HUB_HOST=selenium
+    - HUB_PORT=4444
+
+  todoapp:
+    build: app/
+    ports:
+      - 8080:80
+
+  tests:
+    build: .
+    depends_on:
+      - selenium
+      - chrome
+      - firefox
+      - todoapp
+    volumes:
+    - "./error-shots:/usr/app/error-shots"
+    environment:
+    - SELENIUM_ENV=selenium
+    - TEST_ENV=todoapp
+{{</highlight>}}
+
+With this I was able to execute those tests using docker-compose without worrying about networking
+stuff: `docker-compose run tests npm test`
+
+Of course, even with this simple application I've wasted some time to get the basics working and for
+this, I've configured a local instance of selenium:
+
+{{<highlight bash>}}
+npm install --save-dev wdio-selenium-standalone-service
+./node_modules/.bin/selenium-standalone install
+./node_modules/.bin/selenium-standalone start
+{{</highlight>}}
+
+Next I was ready to run wdio repl:
+{{<highlight bash>}}
+./node_modules/.bin/wdio repl chrome
+{{</highlight>}}
+
+With this debugging was much easier and a bit less frustrating ;)
+
+My examples are hosted on GitHub and because of this I've decided to implement this solution in
+travis-ci (I am running this on gitlab-ci in a very similar way):
+
+{{<highlight yml>}}
+language: node_js
+node_js:
+  - "8"
+
+sudo: required
+
+env:
+  - SELENIUM_VERSION=3.8.1
+
+services:
+  - docker
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -qy build-essential curl
+  - docker build -t todoapp app/
+  - docker run -td --rm -p 127.0.0.1:4444:4444 --name selenium selenium/hub:${SELENIUM_VERSION}
+  - docker run -td --rm -p 127.0.0.1:8080:80 --name todoapp todoapp
+  - docker run -td --rm -e HUB_HOST=selenium -e HUB_PORT=4444 --name chrome --link selenium --link todoapp selenium/node-chrome:${SELENIUM_VERSION}
+  - docker run -td --rm -e HUB_HOST=selenium -e HUB_PORT=4444 --name firefox --link selenium --link todoapp selenium/node-firefox:${SELENIUM_VERSION}
+
+script:
+  - npm test
+{{</highlight>}}
+
+[.small]
+Be aware that for purposes of this demo I did some things that I personally consider bad practices.
+First of all, I've put node_modules in git to make todoapp working. Another bad practice was
+significantly increased test timeout (up to 30s) to avoid cleaning up after tests I just do
+browser.reload() which recreates user profile (about 10 seconds of overhead on each test).
+
+With this I'm ready to write more e2e tests and get even more frustrated while doing so :) My
+initial experiences were pretty painful but I believe that right amount of critical e2e tests will
+help us to deliver better quality and allow deploy each commit on production with confidence.
