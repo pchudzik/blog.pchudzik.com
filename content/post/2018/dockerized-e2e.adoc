@@ -10,7 +10,7 @@ In my free time, I'm trying to learn something new and best of way learning is b
 spinning my wheels in vain I'm helping to develop some product. In the
 https://blog.pchudzik.com/201801/express-pug/[previous post], I've described what we've decided to
 use for the UI and pointed out that I'm going to write integration tests. Here is how I integrated
-selenium e2e tests with gitlab-ci/travis-ci/whatever and run them in docker.
+selenium e2e tests with gitlab-ci/travis-ci/whatever by running them in docker.
 
 
 I don't like either writing nor maintaining end to end tests and because of this, my approach is to
@@ -58,12 +58,32 @@ I've started with wdio setup:
 ./node_modules/.bin/wdio config
 {{</highlight>}}
 
-And then just answered few questions :)
+And then just answered few questions. After few bad experiences, I've decided to pimp this
+configuration a bit and add something to do screenshots of the failed test:
+
+[.small]
+https://github.com/pchudzik/blog-example-e2e-tests/blob/master/wdio.conf.js
+
+{{<highlight javascript>}}
+afterTest: function (test) {
+  if (test.passed) {
+    return;
+  }
+
+  mkdir(this.screenshotPath);
+
+  const filename = encodeURIComponent(test.title.replace(/\s+/g, '-'));
+  const filePath = this.screenshotPath + filename + '.png';
+
+  browser.saveScreenshot(filePath);
+}
+{{</highlight>}}
 
 Next, I've written my first Page Object and 3 tests to have something to work with:
 
 [.small]
 https://github.com/pchudzik/blog-example-e2e-tests/blob/master/test/Todo.page.js
+
 {{<highlight javascript>}}
 const itemSelector = index => `.todo-list li:nth-child(${index + 1})`;
 
@@ -107,6 +127,7 @@ export default new TodoPage();
 
 [.small]
 https://github.com/pchudzik/blog-example-e2e-tests/blob/master/test/todoPage.spec1.js
+
 {{<highlight javascript>}}
 import { expect } from 'chai';
 import todoPage from './Todo.page';
