@@ -1,0 +1,289 @@
+---
+title: "NAT instance on AWS"
+Tags: ["howto", "aws"]
+Categories: ["devops"]
+description: "How to setup private subnet with NAT instance"
+date: "2018-02-27"
+---
+
+At work and in my private time I'm trying to get myself familiar with AWS cloud. Almost all of this
+is new for me. I know how to setup few things using AWS web console but infrastructure as a code was
+calling to me and I wanted to give it a spin. My first task was to create VPC with two pairs of
+subnets for private stuff and here is why I did it twice.
+
+<!--more-->
+
+I've started very ambitiously with blank yml file and cloudformation documentation opened. After
+reading few pages I needed a break because it wasn't exactly what I was hoping for. I was looking
+forward to set up my infrastructure in few lines of yml. That is how AWS is advertising this
+anyway... My guess is that few lines of code are very relative amount ;) So I needed to change the
+tactic I've started by looking at templates from the documentation and then did some digging to look
+on the internet for what I wanted to do.
+
+I've found the template which fitted my needs almost perfectly. After few tweaks, I've deployed it
+on the AWS and I was almost proud of myself. My first cloudformation script and I've got VPC, 2
+public, and 2 private subnets, ECS cluster, task definitions, services, autoscaling, magic ;)
+Luckily I've configured bill alert...
+
+[.center-image]
+image::/post/2018/aws-nat-instance/wallet.jpeg[Billing allert]
+
+[.small]
+https://www.pexels.com/photo/brown-leather-wallet-using-blue-steel-clap-46242/
+
+While setting up LanchConfiguration for autoscaling group I've made sure to use free tier eligible
+t2.micro instances but I didn't check costs for NAT gateways which are pretty high (at least for me,
+where I've got two dockers running on ECS and doing basically nothing). I'm very cheap and the first
+thing I did was remove the stack ;) Next, I've started to look for the pricing and what I can do
+about it. I've noticed that you can use NAT  instance instead of NAT getaway. A quick look at the
+pricing - it will be cheaper (now I'm looking for savings, not for reliability). I've found some
+examples and instructions on how to configure it using cloudformation templates but it wasn't
+working so good for me (copy paste method has failed) and as a result, I was forced to dig a little
+deeper and find out on my own how to set it up properly...
+
+[.small]
+My experience with AWS is close to zero and if you decide to use something from this post and your
+production goes to hell you are on your own. All I can guarantee is that it works for me.
+
+Let's start with the obvious and let's set up VPC with Internet Gateway and two subnets:
+
+{{<highlight YAML>}}
+VPC:
+  Type: AWS::EC2::VPC
+  Properties:
+    CidrBlock: 10.0.0.0/24
+    Tags:
+      - Key: Name
+        Value: !Sub VPC ${pEnvironmentName}
+InternetGateway:
+  Type: AWS::EC2::InternetGateway
+  Properties:
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Internet Gateway
+InternetGatewayAttachment:
+  Type: AWS::EC2::VPCGatewayAttachment
+  Properties:
+    InternetGatewayId: !Ref InternetGateway
+    VpcId: !Ref VPC
+SubnetPublic1:
+  Type: AWS::EC2::Subnet
+  Properties:
+    CidrBlock: 10.0.0.0/26
+    MapPublicIpOnLaunch: true
+    AvailabilityZone: !Select [ 0, !GetAZs ]
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Public Subnet (AZ1)
+SubnetPublic2:
+  Type: AWS::EC2::Subnet
+  Properties:
+    CidrBlock: 10.0.0.64/26
+    MapPublicIpOnLaunch: true
+    AvailabilityZone: !Select [ 1, !GetAZs ]
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Public Subnet (AZ2)
+SubnetPrivate1:
+  Type: AWS::EC2::Subnet
+  Properties:
+    CidrBlock: 10.0.0.128/26
+    MapPublicIpOnLaunch: false
+    AvailabilityZone: !Select [ 0, !GetAZs ]
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Private Subnet (AZ1)
+SubnetPrivate2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      CidrBlock: 10.0.0.192/26
+      AvailabilityZone: !Select [ 1, !GetAZs ]
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${pEnvironmentName} Private Subnet (AZ2)
+{{</highlight>}}
+
+The easy part was done. Now harder bit. Let's configure EC2 instance which will be used as a NAT
+Gateway. Luckily you don't need to be iptables/or whatever magician to have set it up. AWS
+configured the instance for this. All you need to do is find proper AMI id and you are good to go.
+But before we can start with EC2 we have to configure security group for the NAT instance:
+
+{{<highlight YAML>}}
+NatInstanceSercurityGroup:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+    VpcId: !Ref VPC
+    GroupDescription: Access to the nat instnace
+    SecurityGroupIngress:
+      # http & https trafic
+      - CidrIp: 10.0.0.128/25
+        FromPort: 80
+        ToPort: 80
+        IpProtocol: tcp
+      - CidrIp: 10.0.0.128/25
+        FromPort: 443
+        ToPort: 443
+        IpProtocol: tcp
+      #ssh access
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        ToPort: 22
+        IpProtocol: tcp
+      # routing
+      - CidrIp: 10.0.0.128/25
+        IpProtocol: icmp
+        FromPort: -1
+        ToPort: -1
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName}-Nat-SecurityGrouop
+{{</highlight>}}
+
+To quickly wrap it up:
+
+- port 80 and 443 are to allow EC2 instances in private subnet to access the internet.
+- port 22 is for SSH access (it is easier to debug it when you can just login into the machine and
+see what is going on and when it is starting to work). You can also use nat instance as a hop
+machine.
+- protocol ICMP is to allow ec2 instances to ask NAT instance for routing and stuff.
+
+Now I need an AMI id. I can use eu-central-1 image id and get it over with but I wanted to play a
+bit more with AWS API and as a result, I've written a very simple script which has found AMI id for
+all the regions in few seconds:
+
+{{<highlight bash>}}
+#!/usr/bin/env bash
+
+NAME_FILTER=$1
+
+REGIONS=( us-east-2 us-east-1 us-west-2 us-west-1 eu-west-3 eu-west-2 eu-west-1 eu-central-1 ap-northeast-2 ap-northeast-1 ap-southeast-2 ap-southeast-1 ca-central-1 ap-south-1 sa-east-1 )
+for region in "${REGIONS[@]}"; do
+  IMAGES=`aws ec2 describe-images --filters Name=name,Values=${NAME_FILTER} Name=virtualization-type,Values=hvm --owners amazon --region ${region}`
+  AMI_TO_USE=`echo ${IMAGES} | jq .Images | jq -c 'sort_by(.CreationDate) | .[-1]'`
+  IMAGE_ID=`echo ${AMI_TO_USE} | jq -r .ImageId`
+  IMAGE_NAME=`echo ${AMI_TO_USE} | jq -r .Name`
+
+  echo "$region:"
+  echo "    AMI: ${IMAGE_ID} # ${IMAGE_NAME}"
+done
+{{</highlight>}}
+
+[.small]
+https://github.com/pchudzik/blog-example-aws-nat-instance/blob/master/find-ami.sh
+
+With the mapping for AMI id in place I can setup EC2 instance:
+
+{{<highlight yaml>}}
+NatInstance1:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: !Ref pNatInstanceType
+    ImageId: !FindInMap [mAWSRegionToAMI, !Ref "AWS::Region", AMI]
+    SourceDestCheck: false
+    Tags:
+      - Key: Name
+      Value: !Sub ${pEnvironmentName} NAT1 instance
+    KeyName: !Ref pSshKey
+    NetworkInterfaces:
+      - SubnetId: !Ref SubnetPublic1
+      GroupSet:
+        - !Ref NatInstanceSercurityGroup
+      AssociatePublicIpAddress: true
+      DeviceIndex: 0
+NatInstance2:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: !Ref pNatInstanceType
+    ImageId: !FindInMap [mAWSRegionToAMI, !Ref "AWS::Region", AMI]
+    SourceDestCheck: false
+    Tags:
+      - Key: Name
+      Value: !Sub ${pEnvironmentName} NAT2 instance
+    KeyName: !Ref pSshKey
+    NetworkInterfaces:
+      - SubnetId: !Ref SubnetPublic2
+      GroupSet:
+        - !Ref NatInstanceSercurityGroup
+      AssociatePublicIpAddress: true
+      DeviceIndex: 0
+{{</highlight>}}
+
+With ec2 configured I can now setup routing:
+
+{{<highlight yaml>}}
+PublicRouteTable:
+  Type: AWS::EC2::RouteTable
+  Properties:
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Public Routes
+DefaultPublicRoute:
+  Type: AWS::EC2::Route
+  DependsOn: InternetGatewayAttachment
+  Properties:
+    RouteTableId: !Ref PublicRouteTable
+    DestinationCidrBlock: 0.0.0.0/0
+    GatewayId: !Ref InternetGateway
+PublicSubnet1RouteTableAssociation:
+  Type: AWS::EC2::SubnetRouteTableAssociation
+  Properties:
+    RouteTableId: !Ref PublicRouteTable
+    SubnetId: !Ref SubnetPublic1
+PublicSubnet2RouteTableAssociation:
+  Type: AWS::EC2::SubnetRouteTableAssociation
+  Properties:
+    RouteTableId: !Ref PublicRouteTable
+    SubnetId: !Ref SubnetPublic2
+PrivateRouteTable1:
+  Type: AWS::EC2::RouteTable
+  Properties:
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Private Routes (AZ1)
+DefaultPrivateRoute1:
+  Type: AWS::EC2::Route
+  Properties:
+    RouteTableId: !Ref PrivateRouteTable1
+    DestinationCidrBlock: 0.0.0.0/0
+    InstanceId: !Ref NatInstance1
+PrivateSubnet1RouteTableAssociation:
+  Type: AWS::EC2::SubnetRouteTableAssociation
+  Properties:
+    RouteTableId: !Ref PrivateRouteTable1
+    SubnetId: !Ref SubnetPrivate1
+PrivateRouteTable2:
+  Type: AWS::EC2::RouteTable
+  Properties:
+    VpcId: !Ref VPC
+    Tags:
+      - Key: Name
+        Value: !Sub ${pEnvironmentName} Private Routes (AZ2)
+DefaultPrivateRoute2:
+  Type: AWS::EC2::Route
+  Properties:
+    RouteTableId: !Ref PrivateRouteTable2
+    DestinationCidrBlock: 0.0.0.0/0
+    InstanceId: !Ref NatInstance2
+PrivateSubnet2RouteTableAssociation:
+  Type: AWS::EC2::SubnetRouteTableAssociation
+  Properties:
+    RouteTableId: !Ref PrivateRouteTable2
+    SubnetId: !Ref SubnetPrivate2
+{{</highlight>}}
+
+And that is all. With above cloud formation template You'll land with VPC, two private and two
+public subnets and with EC2s serving as a NAT instance. As you can see infrastructure as a code is
+not so bad and allows you to quickly setup everything you might need with few clicks or one API
+call. Next step will be to use this as a base for your actual infrastructure ;) One thing that
+bothers me though is that now I'm fixed on using AWS cloud and migration to any other cloud provider
+will require full rewriting of this stuff. In the future, I'm going to dig deeper into this issue.
+
+Full cloud formation script can be found on my
+https://github.com/pchudzik/blog-example-aws-nat-instance/blob/master/nat-instance.template.yml[GitHub].
