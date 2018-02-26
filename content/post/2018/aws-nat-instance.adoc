@@ -43,9 +43,9 @@ deeper and find out on my own how to set it up properly...
 
 [.small]
 My experience with AWS is close to zero and if you decide to use something from this post and your
-production goes to hell you are on your own. All I can guarantee is that it works for me.
+production goes kaboom you are on your own. All I can guarantee is that it works for me.
 
-Let's start with the obvious and let's set up VPC with Internet Gateway and two subnets:
+Let's start with the obvious and set up VPC with Internet Gateway and two subnets:
 
 {{<highlight YAML>}}
 VPC:
@@ -109,9 +109,9 @@ SubnetPrivate2:
 {{</highlight>}}
 
 The easy part was done. Now harder bit. Let's configure EC2 instance which will be used as a NAT
-Gateway. Luckily you don't need to be iptables/or whatever magician to have set it up. AWS
-configured the instance for this. All you need to do is find proper AMI id and you are good to go.
-But before we can start with EC2 we have to configure security group for the NAT instance:
+Gateway. Luckily you don't need to be iptables/or whatever magician to have set it up. AWS has
+already configured the instance for this. All you need to do is find proper AMI id and you are good
+to go. But before we can start with EC2 we have to configure security group for the NAT instance:
 
 {{<highlight YAML>}}
 NatInstanceSercurityGroup:
@@ -146,7 +146,8 @@ NatInstanceSercurityGroup:
 
 To quickly wrap it up:
 
-- port 80 and 443 are to allow EC2 instances in private subnet to access the internet.
+- port 80 and 443 are to allow EC2 instances in private subnet to access the internet (http(s) is
+sufficient for me).
 - port 22 is for SSH access (it is easier to debug it when you can just login into the machine and
 see what is going on and when it is starting to work). You can also use nat instance as a hop
 machine.
@@ -174,6 +175,8 @@ done
 {{</highlight>}}
 
 [.small]
+Be careful with this because it finds latest image and I've wasted some time lately trying to figure
+out what is wrong with my other cloud formation and I was using latest image which was broken... +
 https://github.com/pchudzik/blog-example-aws-nat-instance/blob/master/find-ami.sh
 
 With the mapping for AMI id in place I can setup EC2 instance:
@@ -286,4 +289,4 @@ bothers me though is that now I'm fixed on using AWS cloud and migration to any 
 will require full rewriting of this stuff. In the future, I'm going to dig deeper into this issue.
 
 Full cloud formation script can be found on my
-https://github.com/pchudzik/blog-example-aws-nat-instance/blob/master/nat-instance.template.yml[GitHub].
+https://github.com/pchudzik/blog-example-aws-nat-instance[GitHub].
