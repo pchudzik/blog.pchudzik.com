@@ -15,10 +15,10 @@ you https://xkcd.com/221/["one simple trick"] that will fix this problem.
 tl;dr - Use dependency injection. Inject source of changing data from the outside and make it return
 a fixed value. Voilà it is done.
 
-Let's start with something simple - time. Every time you check the current time it is it will be
-different. Even if your precision is like a second, minute or even a day there will be a time when
-your tests will fail because they've been executed at the wrong moment. To avoid looking for too
-far-fetched example let's say you need to implement a time-limited discount for a product.
+Let's start with something simple - time. Every time you check it, it will be different. Even if
+your precision is like a second, minute or even a day there will be a time when your tests will fail
+because they've been executed at the wrong moment. To avoid looking for too far-fetched example
+let's say you need to implement a time-limited discount for a product.
 
 
 {{<highlight java>}}
@@ -47,7 +47,11 @@ class DiscountService {
     }
   }
 }
+{{</highlight>}}
 
+And the simple test for the above class:
+
+{{<highlight java>}}
 public class DiscountServiceTest {
   private final long nowMilliseconds = 1521056135184L;
   private final Clock fixedClock = Clock.fixed(
@@ -83,15 +87,15 @@ public class DiscountServiceTest {
 }
 {{</highlight>}}
 
-This is really simple you might say and that you are sure that it is not worth the trouble. Well,
-maybe it isn't maybe it is? How long will discount last in a leap February, are you going to wait
-until February in next two years to check it? How are you going to verify that complicated business
-logic based on current time works? How do you know if the scheduled job will be executed exactly
-when you need it and what will happen with job executed on 30 th day of a month in February?
+This is really simple you might say and you are sure that it is not worth the trouble. Well, maybe
+it isn't maybe it is? How long will discount last in a leap February, are you going to wait until
+February in next two years to check it? How are you going to verify that complicated business logic
+based on current time works? How do you know if the scheduled job will be executed exactly when you
+need? What will happen with job executed on 30 th day of a month in February?
 
 [.small]
 (Clock is for Java 8+ in older java versions we used to inject something which we called
-TimeProvider with method now and it worked the same as a clock for time provider)
+TimeProvider with method now() and it worked the same as a clock for time provider)
 
 [.center-image]
 image::/post/2018/testing-randomness/random_number.png[Randon number]
@@ -118,7 +122,11 @@ class Mage {
     return baseAttack + extraAttackPoints;
   }
 }
+{{</highlight>}}
 
+Tests for calculating maximum and minimum attack points:
+
+{{<highlight java>}}
 public class MageAttackTest {
   private final int minAttackFactor = 0;
   private final int maxAttackFactor = Mage.ATTACK_FACTOR;
@@ -159,9 +167,9 @@ public class MageAttackTest {
 {{</highlight>}}
 
 Sometimes you can not just inject something into a field of your class. Instead of doing some weird
-hacks to make it happen to inject fixed implementation as method parameter as I did above.
+hacks to make it happen just inject fixed implementation as method parameter as I did above.
 
-The solution is very simple, but very often I see LcalDateDate.now() called somewhere inside
+The solution is very simple, but very often I see LocalDateDate.now() called somewhere inside
 business method and I cringe every time because I've spent a lot of time to get rid of something
 like this (don't ask it was long time ago...) to pinpoint and fix a bug which was time-related...
 
