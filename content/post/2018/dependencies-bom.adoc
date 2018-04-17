@@ -6,15 +6,14 @@ description: "Dependencies management using BOMs"
 date: "2018-04-18"
 ---
 
-Managing and versioning a bunch of connected libraries or
-services is especially hard when you have a bunch of customers using these. It doesn’t matter if you
+Managing and versioning a bunch of connected libraries or services is hard. It doesn’t matter if you
 are a consumer or a provider of it. There will be a problem with bumping versions of multiple
-libraries you are using, or there will be a problem with versioning of these. Both sides have
-something to solve or improve. In this post, I'm exploring two simple solutions which might come in
-handy if you develop an ecosystem of libraries/services or when you are a consumer of those. It is
-all about semantic versioning and import scope of BOM in maven dependencies.
+libraries you are using, or there will be a problem with versioning of these. In this post, I'm
+exploring two simple solutions which might come in handy if you develop an ecosystem of
+libraries/services or when you are a consumer of those. It is all about semantic versioning and
+import scope of BOM in maven dependencies.
 
-<!—more—>
+<!--more-->
 
 [.lead]
 tl;dr
@@ -31,7 +30,7 @@ those services I usually got angry with every release because I was forced to bu
 dependencies and track what has changed and what will be the impact of those changes on my project.
 
 With time I’ve learned about https://semver.org/[semantic versioning] which is a very convenient way
-of managing software versioning.
+of managing versions of the software.
 
 Long story short your release version is basically X.Y.Z.
 
@@ -78,7 +77,6 @@ Let's say that as an organization we provide several services:
     <artifactId>order-api</artifactId>
     <packaging>jar</packaging>
     <version>2.1.3</version>
-    <name>orders-api</name>
     <!-- ... -->
 </project>
 
