@@ -6,51 +6,54 @@ description: "Dependencies management using BOMs"
 date: "2018-04-18"
 ---
 
-Managing and versioning a bunch of connected libraries or services is hard. It doesn’t matter if you
-are a consumer or a provider of it. There will be a problem with bumping versions of multiple
-libraries you are using, or there will be a problem with versioning of these. In this post, I'm
-exploring two simple solutions which might come in handy if you develop an ecosystem of
-libraries/services or when you are a consumer of those. It is all about semantic versioning and
-import scope of BOM in maven dependencies.
+Managing and versioning a bunch of connected libraries or services is hard. It doesn’t matter if
+you are a consumer or a provider of it. In this post, I'm exploring two simple solutions which
+might come in handy if you develop an ecosystem of libraries/services or when you are a consumer
+of those. It is all about semantic versioning and import scope of BOM in maven dependencies.
 
 <!--more-->
 
 [.lead]
 tl;dr
 
-* https://semver.org/[Semantic Versioning]
-* https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Importing_Dependencies[Maven import scope and Bill Of Materials]
+* https://semver.org[Semantic Versioning]
+* https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Importing_Dependencies[Maven
+  import scope and Bill Of Materials]
+
+[.lead]
+Semantic Versioning
 
 I’ve been working on few projects in my career and sometimes I was in the team providing libraries
 or services and sometimes I was a consumer of services provided by others. What is scary is that
-every single time we did some weird hacks to handle dependencies management. When I was on the team
-providing services we usually deployed them and we send an email to a bunch of people with
+every single time we did some weird hacks to handle dependencies management. When I was on the
+team providing services we usually deployed them and we send an email to a bunch of people with
 information that we’ve deployed something and that they can update. When I was in a team consuming
 those services I usually got angry with every release because I was forced to bump a bunch of
 dependencies and track what has changed and what will be the impact of those changes on my project.
 
-With time I’ve learned about https://semver.org/[semantic versioning] which is a very convenient way
-of managing versions of the software.
+With time I’ve learned about https://semver.org/[semantic versioning]
+which is a very convenient way of managing versions of the software.
 
-Long story short your release version is basically X.Y.Z.
+Long story short. Your release version is basically https://semver.org[X.Y.Z].
 
-* X is for major breaking changes (API change which breaks the contract)
+* X is for major breaking changes (API change, which breaks the contract)
 * Y is for a minor change, for example, new feature but backward compatible
 * Z is for bug fixes
 
-On the internet, you’ll be able to find more information on this.
+[.lead]
+Bill Of Materials
 
-Next, I’ve learned about import scope for maven dependencies which allows users to easily upgrade
-all the dependencies they are using. Semantic versioning is simple to understand. BOM usage is not
-so complicated but it is easier to explain using more concrete examples.
+Next, I’ve learned about import scope for maven dependencies which allows users to easily
+upgrade all the dependencies they are using. Semantic versioning is simple to understand.
+BOM usage is not so complicated but it is easier to explain using more concrete examples.
 
 Let’s say we are working on a platform which provides bunch of libraries (or services, doesn’t
 really matter) and as a platform we release it all because it is more convent for us to work this
 way (been there and understand that in some cases it really is, at least for one side…). Let’s say
 we want to be good for the users, that’s why we are using semantic versioning, and provide some
-convenient way for the users to use our services. We can send an email to the users and politely ask
-them to update all the dependencies we’ve changed, or we can do something better and update all the
-dependencies for them, and ask them to bump only one dependency instead. That’s when
+convenient way for the users to use our services. We can send an email to the users and politely
+ask them to update all the dependencies we’ve changed, or we can do something better and update
+all the dependencies for them, and ask them to bump only one dependency instead. That’s when
 https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Importing_Dependencies[maven’s
 BOM (Bill Of Materials) and import scope] comes into play.
 
@@ -103,7 +106,7 @@ Let's say that as an organization we provide several services:
 </project>
 {{</highlight>}}
 
-As a responsible team we provide something extra:
+As a responsible team we can (and should) provide something extra:
 
 {{<highlight xml>}}
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -226,10 +229,13 @@ about updating versions of each library he is using:
 </project>
 {{</highlight>}}
 
-This is nothing new. It’s been in maven since version 2.0.9, what is more, big players are using it
--
+[.lead]
+Summary
+
+This is nothing new. It’s been in maven since version
+2.0.9, what is more, big players are using it -
 https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/spring-boot-parent/pom.xml[spring]
 (https://docs.spring.io/spring-boot/docs/current/reference/html/using-boot-build-systems.html#using-boot-maven-without-a-parent[docs]).
-Too good to be real? Maybe. It will work perfectly in some cases and might be very problematic in
-others. The important thing to remember is that there is an option. This is not a silver bullet, but
-it would’ve saved me a lot of time in the past if I'd known about it…
+Too good to be real? Maybe. It will work perfectly in some cases and might be very problematic in others.
+The important thing to remember is that there is an option. This is not a silver bullet, but it would’ve
+saved me a lot of time in the past if I'd known about it…
