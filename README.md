@@ -14,7 +14,7 @@ docker build -t hugo .
 ### serve built files
 
 ```
-docker run -it --rm -v "$(pwd):/site" -p 1313:1313 hugo serve
+docker run -it --rm -v "$(pwd):/site" -p 1313:1313 hugo serve -w
 ```
 
 ### build site for deployment

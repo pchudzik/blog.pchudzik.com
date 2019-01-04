@@ -7,7 +7,7 @@ RUN apt-get -q -y install wget lftp
 RUN apt-get -q -y install asciidoctor
 
 WORKDIR /tmp
-RUN wget -q -O hugo.tar.gz https://github.com/gohugoio/hugo/releases/download/v0.34/hugo_0.34_Linux-64bit.tar.gz
+RUN wget -q -O hugo.tar.gz https://github.com/gohugoio/hugo/releases/download/v0.53/hugo_0.53_Linux-64bit.tar.gz
 RUN tar xf hugo.tar.gz
 RUN mv hugo /bin/
 
