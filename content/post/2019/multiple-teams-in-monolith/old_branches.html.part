@@ -1,0 +1,115 @@
+<div style="text-align: center">
+    <canvas id='gitGraphOld'></canvas>
+</div>
+
+<script>
+    windowWith = document.documentElement.clientWidth || document.body.clientWidth || window.innerWidth;
+    var orientation = 'horizontal';
+    var mode = 'compact';
+    if ( windowWith < 750) {
+        orientation = 'vertical';
+        mode = 'compact';
+    }
+
+    var gitgraph = new GitGraph({
+        orientation: orientation,
+        mode: mode,
+        elementId: 'gitGraphOld',
+        template: {
+            branch: {
+                lineWidth: 8,
+                spacingX: 50,
+                showLabel: true,
+                labelFont: 'normal 12pt Arial',
+                labelRotation: 0
+            },
+            commit: {
+                spacingY: -40,
+                dot: {
+                    size: 12
+                },
+                message: {
+                    color: 'black',
+                    font: 'normal 12pt Arial'
+                },
+                tooltipHTMLFormatter: function (commit) {
+                    return commit.sha1 + ' - ' + commit.author + ': ' + commit.message;
+                }
+            }
+        }
+    });
+
+    var master = gitgraph.branch('master');
+    master
+        .commit({
+            message: 'No changes made',
+            author: 'Michele D. Connolly'
+        })
+        .commit({
+            message: 'Only Tom Cruise knows why.',
+            author: 'Gretchen B. Owen'
+        });
+
+    var releaseCandidate1 = master.branch('v12.34_rc');
+    releaseCandidate1
+        .commit({
+            message: 'fuckup',
+            author: 'Gretchen B. Owen'
+        });
+
+    master
+        .commit({
+            message: 'Bit Bucket is down. What should I do now?',
+            author: 'Kevin R. Hill'
+        })
+        .commit({
+            message: 'why is everything broken',
+            author: 'Tracy Z. Bartel'
+        });
+
+    releaseCandidate1.commit({
+        message: 'And a commit that I don\'t know the reason of...',
+        author: 'Samuel E. Scales'
+    });
+
+    releaseCandidate1.merge(master, {
+        author: 'Michele D. Connolly'
+    });
+
+    master
+        .commit({
+            message: 'GABE, WE WENT OVER THIS. EXPANDTAB.',
+            author: 'Samuel E. Scales'
+        })
+        .commit({
+            message: 'This is the last time we let Samuel commit ascii porn in the comments.',
+            author: 'Kevin R. Hill'
+        });
+
+    var releaseCandidate2 = master.branch('v12.35_rc');
+
+    master
+        .commit({
+            message: 'Test commit. Please ignore',
+            author: 'Kevin R. Hill'
+        })
+        .commit({
+            message: 'really ignore ignored worsd',
+            author: 'Kevin R. Hill'
+        });
+
+    releaseCandidate2.commit({
+        message: 'Why The Fuck?',
+        author: 'Ben J. Carpenter'
+    });
+
+    releaseCandidate2.merge(master, {
+        author: 'Ben J. Carpenter'
+    });
+
+    master
+        .commit({
+            message: 'No time to commit.. My people need me!',
+            author: 'Samuel E. Scales'
+        });
+</script>

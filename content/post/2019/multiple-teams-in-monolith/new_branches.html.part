@@ -1,0 +1,146 @@
+<div style="text-align: center">
+    <canvas id='gitGraphNew'></canvas>
+</div>
+
+<script>
+    var windowWith = document.documentElement.clientWidth || document.body.clientWidth || window.innerWidth;
+    var orientation = 'horizontal';
+    var mode = 'compact';
+    console.log('w', windowWith);
+    if (windowWith < 1130) {
+        orientation = 'vertical';
+        mode = 'compact';
+    }
+
+    var gitgraph = new GitGraph({
+        orientation: orientation,
+        mode: mode,
+        elementId: 'gitGraphNew',
+        template: {
+            branch: {
+                lineWidth: 8,
+                spacingX: 50,
+                showLabel: true,
+                labelFont: 'normal 12pt Arial',
+                labelRotation: 0
+            },
+            commit: {
+                spacingY: -40,
+                dot: {
+                    size: 12
+                },
+                message: {
+                    color: 'black',
+                    font: 'normal 12pt Arial'
+                },
+                tooltipHTMLFormatter: function (commit) {
+                    return commit.sha1 + ' - ' + commit.author + ': ' + commit.message;
+                }
+            }
+        }
+    });
+
+    var master = gitgraph.branch('master');
+
+    master
+        .commit({
+            message: 'Version update after release',
+            author: 'Michele D. Connolly'
+        });
+
+    var releaseBranch = master.branch('v12.34_rc');
+    releaseBranch
+        .commit({
+            message: 'One little whitespace gets its very own commit! Oh, life is so erratic!',
+            author: 'Gretchen B. Owen'
+        });
+
+    var deva = master.branch('development_a');
+    var devb = master.branch('development_b');
+
+    deva
+        .commit({
+            message: 'done. going to bed now.',
+            author: 'Samuel E. Scales'
+        })
+        .commit({
+            message: 'this is why docs are important',
+            author: 'Gretchen B. Owen'
+        });
+
+    var feature = deva.branch('feature_192');
+    feature
+        .commit({
+            message: 'commit',
+            author: 'Kevin R. Hill'
+        })
+        .commit({
+            message: 'debug line test',
+            author: 'Michele D. Connolly'
+        });
+
+    deva.commit({
+        message: 'This should work until december 2019',
+        author: 'Gretchen B. Owen'
+    });
+    feature.merge(
+        deva, {
+            author: 'Ben J. Carpenter'
+        });
+    deva.commit({
+        message: 'lots and lots of changes',
+        author: 'Ben J. Carpenter'
+    });
+
+    deva.merge(master);
+    deva
+        .commit({
+            message: 'GIT :/',
+            author: 'Gretchen B. Owen'
+        })
+        .commit({
+            message: 'that coulda been bad',
+            author: 'Tracy Z. Bartel'
+        });
+
+    devb
+        .commit({
+            message: 'Feed. You. Stuff. No time.',
+            author: 'Gretchen B. Owen'
+        });
+
+    master.merge(
+        devb, {
+            author: 'Ben J. Carpenter'
+        });
+
+    devb
+        .commit({
+            message: 'Never Run This Commit As Root',
+            author: 'Samuel E. Scales'
+        });
+
+    releaseBranch
+        .commit({
+            message: 'Merging \'WIP: Do Not Merge This Branch\' Into Master',
+            author: 'Michele D. Connolly'
+        })
+        .commit({
+            message: 'Ugh. Bad rebase.',
+            author: 'Samuel E. Scales'
+        });
+
+    releaseBranch.merge(master, {author: 'Michele D. Connolly'})
+    master.commit({
+        message: 'tagging release w.t.f.',
+        author: 'Kevin R. Hill'
+    });
+
+    devb.merge(master, {author: 'Ben J. Carpenter'})
+
+    devb
+        .commit({
+            message: 'Rush B!',
+            author: 'Kevin R. Hill'
+        });
+</script>

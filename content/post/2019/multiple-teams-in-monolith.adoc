@@ -1,0 +1,162 @@
+---
+title: "Multiple teams and monolith"
+Tags: ["development", "git", "testing"]
+Categories: ["other"]
+description: "Multiple teams working on one monolith"
+date: "2019-01-10T18:50:48+02:00"
+---
+
+At work I'm are engaged in the maintenance and development of a pretty big legacy monolithic
+application. Some time ago team size basically doubled. To keep things simple and activate more
+people we decided that we need to split the huge team into smaller more focused parties. Here is how
+we are working on many features of the same code base in single monolith with multiple teams.
+
+<!--more-->
+
+++++
+include::content/post/2019/multiple-teams-in-monolith/branches.html.part[]
+++++
+
+[.lead]
+tl;dr
+
+* use tweaked git flow process with development_X branches where X is a name of the team
+
+* merge development_X branches to master
+
+* from master create release candidate branch
+
+[.center-image]
+image::/post/2019/multiple-teams-in-monolith/branches.jpg[Branches]
+
+[.lead]
+Assumptions
+
+First of all couple of assumptions that you should be aware of for which we’ve planned process:
+
+* Each team has a dedicated environment on which they can do tests.
+
+* Each team wants to be independent of other team's tasks.
+
+* Teams want to release their changes and not to be blocked by other team's "almost done things”.
+
+* We have a regular release scheduled and there is no big pressure on team because they can always
+  hop on the next "release train".
+
+[.small]
+
+We are still struggling with getting everything under control so sometimes those points are wannabes
+and not yet implemented.
+
+
+[.lead]
+The old
+
+First thing we noticed after split was the last pinpoint from the list above. One of the teams is
+working on big refactor of the application and as a result we produce some risky code that tends to
+get back from testing (different story). Because of it we've stopped deployment of other team's work
+once or twice. To address this issue we had to rethink how we work with git.
+
+++++
+include::content/post/2019/multiple-teams-in-monolith/old_branches.html.part[]
+++++
+
+So up until recently, we’ve been using simplest flow possible with
+https://www.gerritcodereview.com[gerrit]. We had `master` branch and when getting closer to planned
+release we’ve been creating release candidate branch (`rc`) on which we’ve been stabilizing
+application (we are still lacking automated tests to do CD). In the meantime, ongoing development
+has been done on `master` branch. After the release `rc` branch was merged back to master and cycle
+repeated.
+
+It was working ok with one team, but with two teams it was getting a bit out of control and has been
+causing some problems. As a result, we came out with a new flow aimed to solve this issue.
+
+
+[.lead]
+The new
+
+It is based on git flow and has been created with the independence of teams in mind.
+
+++++
+include::content/post/2019/multiple-teams-in-monolith/new_branches.html.part[]
+++++
+
+We still have `master` branch but now it is meant for tested and verified commits. We still have
+release candidate branch to stabilize application before release (it is complicated...). Each team
+has their own development branch on which they do day-to-day development.
+
+From a developer perspective it looks pretty simple. I’m working on task ABC-123 I do some changes
+and push changes for review on branch `development_a`. When CR is done, change is accepted and lands
+on branch `development_a` it is my responsibility to deploy this version on environment_a. Now QA
+team checks the change and in case of any problems, it’s my responsibility to fix any issues. To
+this point, it looks pretty standard we’ve just changed branch name from `master` to
+`development_a`.
+
+
+[.center-image]
+image::/post/2019/multiple-teams-in-monolith/ship-it.jpg[Ship it!]
+
+Things are getting a bit more complicated with release. A person marked as release manager aligns
+with teams and QA team on what is ready for the release (at this point it is ok for the team to say
+we don’t want to release now). Release manager merges ready to release `development_X` branches into
+`master` branch, resolves any conflicts (or finds people who will know how to resolve them). If
+everything looks good she creates release candidate branch and deploys it on the pre-prod
+environment. Next QA team to run all necessary tests on this version. At this point, all changes
+prepared for the release are already tested and everything should work just fine, so this step
+should more like a sanity check. In case of any problems on release candidate branch release manager
+fixes those changes (or finds people best qualified to do the fix). If possible fixes are applied on
+`rc` branch and testing process is executed again. If everything works then we do production
+deployment from `rc` branch. Release manager then merges `rc` branch back to `master`, and `master`
+branch to `development_X branches`. With next release cycle repeats.
+
+We decided to keep `master` branch in the middle of the process because we want to encourage teams
+to merge their ready to deploy things to `master` branch as soon as they are tested and ready. this
+part of the process is not yet working for us but I believe we will get there. If not, we'll just
+cut out `master` branch from release process and merge changes from `development_X` branches to `rc`
+branch and update master branch after the release.
+
+Support of the application is also team responsibility and for any urgent fixes we have `rc` branch
+on which we can apply the single fix and deploy it on production without going through the whole
+release process.
+
+
+[.lead]
+Downsides
+
+* Complicated release process (many branches, merging things, possible code conflicts).
+
+* When features overlap they should be retested.
+
+* Release manager role has to be introduced for someone to organize the release.
+
+* Some unexpected dependencies can be detected only during the last phase of testing
+
+
+[.lead]
+Summary
+
+As you can see it is not as simple as with one team but in reality, it is not as complicated as it
+sounds because as long teamwork is planned just right we do not have serious conflicts when merging
+changes. After running it manually a few times we will probably introduce some automation to the
+process. For now, we decided to do it by hand and give it some time to settle in and find out what
+needs to be improved.
+
+
+The hidden agenda behind this process is that:
+
+*  We’ll do releases more often and at some point drop release candidate branches.
+
+* Tams will start to think ahead when working on bigger features and how to deliver them in
+  smaller chunks or to toggle them from day one.
+
+* We’ll be able to work independently from each other and work in multiple streams.
+
+This is a living process and we are aligning details on how we work as we go. We tweak this workflow
+to our needs but this something we’ve started with and for now it works fine for us.
+
+[.small]
+
+* Git log graphs has been generated using http://gitgraphjs.com[gitgraphjs]
+* Commit messages has been generated using http://whatthecommit.com[whatthecommit.com]
+* https://www.pexels.com/photo/monochrome-photography-of-bare-tree-962317/
+* https://www.pexels.com/photo/aerial-view-of-cargo-ship-1554646/
