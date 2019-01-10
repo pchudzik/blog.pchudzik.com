@@ -31,7 +31,10 @@ RUN echo '#!/bin/sh \n\
 lftp \
 	-u $FTP_USER,$FTP_PASSWORD \
 	ftp://blog.pchudzik.com \
-	-e "set ftp:ssl-allow off; mirror --delete -R /dist private_html; exit"' > /bin/deploy
+	-e "set ftp:ssl-allow off; \
+		mirror \
+			--delete -R --depth-first --parallel=4 -v \
+			/dist private_html; exit"' > /bin/deploy
 
 RUN chmod +x \
 	/bin/serve \
