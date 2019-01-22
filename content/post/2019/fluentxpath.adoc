@@ -1,0 +1,171 @@
+---
+title: "Introducing fluentXPath"
+Tags: ["java", "testing"]
+Categories: ["java"]
+description: "Fluently build xpath expressions in java"
+date: "2019-01-22"
+---
+
+Some time ago I've started working on updating automated tests written in selenium with java. After
+working a bit with it I've noticed that from time to time constructing XPath expression can get
+ugly. We are writing our tests in pure java and "ugliness" usually comes from string concatenation
+when some extra parameters must be taken into account. I've decided to
+https://github.com/pchudzik/fluentxpath[write something] that might help a bit with building XPaths
+without string concatenation.
+
+<!--more-->
+
+[.lead]
+tl;dr
+
+I've created https://github.com/pchudzik/fluentxpath[fluentXPath] library which allows to build
+XPath expression without concatenating strings and provides fluent syntax to construct XPaths.
+
+
+[.lead]
+No warranty of any kind
+
+Note that does not offer anything but builder for XPaths. It doesn't check if your XPath is valid
+it's nothing but syntactic sugar so you don't have to concatenate strings. If you are using groovy
+or Kotlin or any other JVM language with string interpolation you should probably use interpolation
+instead of fluentXPath. Except from a bit of suggar there is nothing extra that you wouldn't achieve
+with simple string concatenation and unless your expression are complex you should be fine with
+simple `"a" + "b"`.
+
+
+[.lead]
+Why?
+
+Firstly I don't like to concatenate strings and for now, I'll have to use pure java for automated
+tests. The second reason was to learn and understand better complex XPath expressions.
+
+
+[.lead]
+Examples
+
+{{<highlight java>}}
+String builderCommentsLink = xpathOf()
+    .anyElement("div")
+    .has(
+            xpathFn().and(asList(
+                    xpathFn().eq(xpathAttribute("data-test-article-id"), xpathValue("123")),
+                    xpathFn().contains(
+                        xpathFn().lowerCase(xpathAttribute("data-test-article-category")),
+                        xpathValue("News")))))
+    .descendantElement("span")
+    .has(
+            xpathFn().contains(
+                    xpathAttribute("class"),
+                    xpathValue("links")))
+    .descendantElement("a")
+    .has(
+        xpathFn().contains(
+            xpathFn().lowerCase(xpathFn().text()),
+            xpathValue("comments")))
+    .build();
+{{</highlight>}}
+
+You can write something more complex which allows to build XPaths more dynamically:
+
+{{<highlight java>}}
+Stream<String> newArticleIds = Stream.of("1","2","3","4");
+
+private static List<XPathExpression> articleIdIn(Stream<String> newArticleIds) {
+    return newArticleIds
+        .map(singleArticleId -> xpathFn().eq(
+                xpathAttribute("data-test-article-id"),
+                xpathValue(singleArticleId)))
+        .collect(Collectors.toList());
+}
+
+xpathOf()
+    .anyElement("div")
+    .has(
+            xpathFn().and(asList(
+                    xpathFn().or(articleIdIn(newArticleIds)),
+                    xpathFn().contains(
+                        xpathFn().lowerCase(xpathAttribute("data-test-article-category")),
+                        xpathValue("News")))))
+    .descendantElement("span")
+    .has(
+            xpathFn().contains(
+                    xpathAttribute("class"),
+                    xpathValue("links")))
+    .descendantElement("a")
+    .has(xpathFn().contains(
+        xpathFn().lowerCase(xpathFn().text()),
+        xpathValue("comments")))
+    .build();
+{{</highlight>}}
+
+Of course many functions are still missing but you are free to define them on your own (or create
+something  that you'll be able to use like aliases).
+
+{{<highlight java>}}
+private static class XPathCount implements XPathExpression {
+    private final XPathExpression expression;
+
+    private XPathCount(XPathExpression expression) {
+        this.expression = expression;
+    }
+
+    @Override
+    public String build() {
+        return "count((" +
+                expression.build() +
+                "))";
+    }
+}
+
+xpathFn().greaterThan(
+        new XPathCount(xpathOf()
+            .anyElement("a")
+            .has(xpathFn().contains(
+                xpathAttribute("class"),
+                xpathValue("links")))),
+        xpathValue(4))
+    .build();
+{{</highlight>}}
+
+More examples:
+
+* https://github.com/pchudzik/fluentxpath/blob/master/src/main/java/com/pchudzik/fluentxpath/api/Demo.java[src/main/java/com/pchudzik/fluentxpath/api/Demo.java]
+* https://github.com/pchudzik/fluentxpath/blob/master/src/test/groovy/com/pchudzik/fluentxpath/api/MSDNSamplesTest.groovy[src/test/groovy/com/pchudzik/fluentxpath/api/MSDNSamplesTest.groovy]
+* https://github.com/pchudzik/fluentxpath/blob/master/src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderExpressionTest.groovy[src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderExpressionTest.groovy]
+* https://github.com/pchudzik/fluentxpath/blob/master/src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderFunctionTest.groovy[src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderFunctionTest.groovy]
+* https://github.com/pchudzik/fluentxpath/blob/master/src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderAxisTest.groovy[src/test/groovy/com/pchudzik/fluentxpath/api/XPathBuilderAxisTest.groovy]
+
+[.lead]
+How to get it
+
+Just add dependencies to pom.xml:
+
+{{<highlight xml>}}
+<dependency>
+  <groupId>com.pchudzik</groupId>
+  <artifactId>fluentxpath</artifactId>
+  <version>1.0.0</version>
+</dependency>
+{{</highlight>}}
+
+or to build.gradle:
+
+{{<highlight gradle>}}
+compile "com.pchudzik:fluentxpath:1.0.0"
+{{</highlight>}}
+
+To find out latest available version you check out
+https://github.com/pchudzik/fluentxpath/blob/master/README.md#releases[readme file]. If you decide to give it
+a try please let me know about any https://github.com/pchudzik/fluentxpath/issues/new[bugs] I’ve
+missed. Don’t hesitate to https://github.com/pchudzik/fluentxpath/issues/new[request new features]
+there is a good chance that I’ll implement them.
+
+
+[.lead]
+Alternatives
+
+* String interpolation
+* Simple https://docs.oracle.com/javase/8/docs/api/java/lang/String.html#format-java.lang.String-java.lang.Object...-[String#format]
+* https://commons.apache.org/proper/commons-lang/apidocs/org/apache/commons/lang3/text/StrSubstitutor.html[StrSubstitutor]
+* https://github.com/spullara/mustache.java/[mustache.java]
+* or even http://velocity.apache.org[velocity] or https://freemarker.apache.org[freemarker] if you need some big guns ;)
