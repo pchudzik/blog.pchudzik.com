@@ -1,0 +1,279 @@
+---
+title: "Deployment with gradle"
+Tags: ["gradle", "mvn"]
+Categories: ["java"]
+description: "Hot to configure deployment fro gradle to nexus and artifactory"
+date: "2019-02-06"
+---
+
+
+I’ve been working with gradle for some time but I’ve never needed to configure deployment from
+gradle to maven repository. In this post, I’m going to configure deployment of java based gradle
+project to the nexus artifact repository. This will include uploading a signed jar itself with
+javadoc and sources.
+
+<!--more-->
+
+Before we can start let’s setup nexus repository. I’m going to use docker for this and you can do it
+easily by simply running:
+
+{{<highlight text>}}
+docker run --name nexus -it -p 8081:8081 sonatype/nexus3:3.15.1
+{{</highlight>}}
+
+Now you can open http://localhost:8081 to see if everything works just fine if you can see nexus
+welcome page you are good to go.
+
+Let’s take a quick look at plugins I’ll be using for deployment configuration:
+
+* https://docs.gradle.org/current/userguide/java_plugin.html[Java] - duh we need it to compile our
+  java code and generate javadoc and sources jar.
+* https://docs.gradle.org/current/userguide/java_library_plugin.html[Java-library] - optional plugin
+  that basically exposes extra dependency scope - api (more on it later).
+* https://docs.gradle.org/current/userguide/publishing_maven.html[Maven-publish] - which will be
+  the workhorse of our deployment process, it will be used to publish artifact to the maven repository.
+* https://docs.gradle.org/current/userguide/signing_plugin.html[Signing] - plugin which can sign
+  artifact using gpg keys.
+
+To sum up, after adding those plugins configuration should contain:
+
+{{<highlight gradle>}}
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+{{</highlight>}}
+
+
+Before publishing anything you should know how dependencies will be configured. Let's take a look at
+java-library plugin. The main thing to know is that
+https://docs.gradle.org/current/userguide/java_library_plugin.html[java-library plugin] exposes
+additional configuration - api:
+
+[quote, java-library sepration, https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_separation]
+____
+The api configuration should be used to declare dependencies which are exported by the library API,
+whereas the implementation configuration should be used to declare dependencies which are internal
+to the component.
+____
+
+
+To understand it better we can declare two dependencies in our project
+
+{{<highlight gradle>}}
+dependencies {
+    api 'org.apache.commons:commons-collections4:4.2'
+    implementation 'org.apache.commons:commons-lang3:3.5'
+    testImplementation 'org.spockframework:spock-core:1.2-groovy-2.5'
+}
+{{</highlight>}}
+
+And use them in following class:
+
+{{<highlight java>}}
+import org.apache.commons.collections4.BidiMap;
+import org.apache.commons.collections4.bidimap.DualHashBidiMap;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class SampleClass {
+    public BidiMap<String, String> hello(String key, String value) {
+        Map<String, String> map = new HashMap<>();
+        map.put(StringUtils.lowerCase(key), StringUtils.lowerCase(value));
+        return new DualHashBidiMap<>(map);
+    }
+}
+{{</highlight>}}
+
+In here we have BidiMap which is part of public API and is exposed to clients whereas commons-lang
+is an internal implementation detail - commons-collections is part of your API and commons-lang is
+an implementation detail
+(https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_recognizing_dependencies[extensive
+explanation]).
+
+Adding dependencies using those gradle configurations will produce following dependencies section in
+pom.xml file:
+
+{{<highlight xml>}}
+ <dependencies>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>4.2</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.5</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+{{</highlight>}}
+[.small]
+We'll get to generating pom file soon.
+
+Commons-collections as a part of public API is compile scope. Commons-lang is an internal
+implementation detail.
+https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#Dependency_Scope[More
+on maven dependencies scopes].
+
+Now let’s quickly configure maven-publisher plugin (all of the entries below are required if you
+want your project to be accepted in central maven repo):
+
+{{<highlight gradle>}}
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact sourcesJar
+            artifact javadocJar
+
+            from components.java
+
+            pom {
+                name = 'Sample project that can be deployed with gradle to nexus'
+                description = 'Detailed description of sample project that can be deployed with gradle to nexus'
+                url = 'http://www.example.com/library'
+                licenses {
+                    license {
+                        name = 'MIT'
+                        url = 'https://opensource.org/licenses/MIT'
+                    }
+                }
+                developers {
+                    developer {
+                        name = 'Paweł Chudzik'
+                        email = 'pawel.chudzik@somewhere.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://example.com/my-library.git'
+                    developerConnection = 'scm:git:ssh://example.com/my-library.git'
+                    url = 'http://example.com/my-library/'
+                }
+            }
+
+            repositories {
+                maven {
+                    def releasesRepoUrl = "http://localhost:8081/repository/maven-releases/"
+                    def snapshotsRepoUrl = "http://localhost:8081/repository/maven-snapshots/"
+                    url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+                    credentials {
+                        username = System.getProperty("nexusUser")
+                        password = System.getProperty("nexusPassword")
+                    }
+                }
+            }
+        }
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/blog-example-gradle-deployment/blob/master/build.gradle[Complete
+build.gradle file]
+
+You might not want to store security credentials directly in your build.gradle file. To keep it
+simple you can pass credentials using the command line. When you use travisci as your CI tool
+passwords will be automatically masked for you. When using Jenkins you can install and active
+https://wiki.jenkins.io/display/JENKINS/Mask+Passwords+Plugin[mask passwords plugin].
+
+A comprehensive description of the publishing maven plugin and up to the date of example can be
+found on https://docs.gradle.org/current/userguide/publishing_maven.html[plugin page] where you’ll
+find more details and options on what can be configured.
+
+At this point we can generate pom file executing gradle task:
+`generatePomFileForMavenJavaPublication` (`./gradlew generatePomFileForMavenJavaPublication`).
+gradle will generate pom file in directory `build/publications/mavenJava/`. In our case  it’s pretty
+simple.
+
+{{<highlight xml>}}
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.pchudzik.blog.example.gradledeployment</groupId>
+  <artifactId>sample-project</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <name>Sample project that can be deployed with gradle to nexus</name>
+  <description>Detailed description of sample project that can be deployed with gradle to nexus</description>
+  <url>http://www.example.com/library</url>
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Paweł Chudzik</name>
+      <email>pawel.chudzik@somewhere.com</email>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git://example.com/my-library.git</connection>
+    <developerConnection>scm:git:ssh://example.com/my-library.git</developerConnection>
+    <url>http://example.com/my-library/</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>4.2</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.5</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+</project>
+{{</highlight>}}
+
+We are almost ready to publish our project but before we can actually do it we should make sure that
+javadoc and sources will be part of the deployment so users will be able to download sources and
+documentation from nexus. It's must have if you want to publish to maven central repo:
+
+{{<highlight gradle>}}
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    classifier = 'javadoc'
+}
+{{</highlight>}}
+[.small]
+`artifact sourcesJar` and `artifact javadocJar` in publishing plugin configuration
+
+Now we are ready to publish our project to nexus by simply running:
+
+{{<highlight text>}}
+./gradlew clean publish -DnexusUser=admin -DnexusPassword=admin123
+{{</highlight>}}
+
+Your corporate artifactory/nexus might accept not signed artifacts but if you want to deploy
+something to central maven repo you must sign your artifacts with gpg key. Good how to instruction
+can be found on https://central.sonatype.org/pages/working-with-pgp-signatures.html[maven central
+website].
+
+To sign artifact you should add signing plugin and configure additional task (simply put it after
+publishing task configuration):
+
+{{<highlight gradle>}}
+signing {
+    useGpgCmd()
+    sign publishing.publications.mavenJava
+}
+{{</highlight>}}
+
+With this, you are good to go and ready to publish your changes to your corporate nexus or to public
+maven repository.

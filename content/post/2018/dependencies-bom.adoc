@@ -239,3 +239,6 @@ https://github.com/spring-projects/spring-boot/blob/master/spring-boot-project/s
 Too good to be real? Maybe. It will work perfectly in some cases and might be very problematic in others.
 The important thing to remember is that there is an option. This is not a silver bullet, but it would’ve
 saved me a lot of time in the past if I'd known about it…
+
+[.small]
+https://github.com/blog-pchudzik-examples/blog-example-maven-bom[Examples]
