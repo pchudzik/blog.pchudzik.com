@@ -1,0 +1,329 @@
+---
+title: "Spring internals - BeanPostProcessor"
+Tags: ["java", "spring"]
+Categories: ["java"]
+description: "How spring internals works and how to customize beans using BeanPostProcessor."
+date: "2019-02-20"
+---
+
+Have you ever wondered how spring does things? How field annotated with `@Autowired` is populated?
+How asynchronous or scheduled methods are discovered. In this post, I’m going to take a deeper look
+and scratch a bit on the surface of spring internals. I'll focus on `BeanPostProcessor` interface
+which can be used to achieve interesting things and is used in many various functionalities across
+spring framework itself.
+
+<!--more-->
+
+[.lead]
+Spring container boot process
+
+Let's take a look at the spring boot process which can give us a hint on how important part of the
+framework this hook is.
+
+{{<highlight java>}}
+@Override
+public void refresh() throws BeansException, IllegalStateException {
+    synchronized (this.startupShutdownMonitor) {
+        prepareRefresh();
+
+        ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+        prepareBeanFactory(beanFactory);
+
+        try {
+            postProcessBeanFactory(beanFactory);
+            invokeBeanFactoryPostProcessors(beanFactory);
+            registerBeanPostProcessors(beanFactory);
+            initMessageSource();
+            initApplicationEventMulticaster();
+            onRefresh();
+            registerListeners();
+            finishBeanFactoryInitialization(beanFactory);
+            finishRefresh();
+        } catch (BeansException ex) {
+            destroyBeans();
+            cancelRefresh(ex);
+            throw ex;
+        } finally {
+            resetCommonCaches();
+        }
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java#L512[org.springframework.context.support.AbstractApplicationContext#refresh]
+
+To quickly recap how things are happening during spring context initialization. Firstly all beans
+definitions are registered in `BeanFactory` then `BeanFactoryPostprocessors` are applied on the
+`BeanFactory` (this is the moment when you can change definitions of beans registered in
+`BeanFactory` and I will dig into this some other day). Next step is registration of
+`BeanPostProcessors`. Those registered `BeanPostProcessors` are executed at a later time when
+someone is actually requesting bean to be created/retrieved from IoC container - when they are
+needed
+(https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/support/FactoryBeanRegistrySupport.java#L203[FactoryBeanRegistrySupport#postProcessObjectFromFactoryBean]).
+
+[.lead]
+BeanPostProcessor interface
+
+{{<highlight java>}}
+public interface BeanPostProcessor {
+	@Nullable
+	default Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+		return bean;
+	}
+
+	@Nullable
+	default Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+		return bean;
+	}
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/config/BeanPostProcessor.java[org.springframework.beans.factory.config.BeanPostProcessor]
+
+
+This hook allows customization of bean instance just after bean creation or after it's been
+initialized. All `BeanPostProcessor` which are annotated or declared (anyone remembers xmls?) will
+be automatically recognized and picked up by the framework when it definitions are registered.
+
+As you can see there are only two methods in this interface: `postProcessBeforeInitialization` and
+`postProcesAfterInitialization` as the name suggest first method is executed before the bean init
+code (`@PostConstruct` or `afterPropertiesSet` hook). After initialization hook is executed when the
+bean has been initialized (after `afterPropertiesSet` or `@PostConstruct`). Extra area of
+possibilities is presented to the users because `BeanPostProcessor` hook is executed also on
+`FactoryBean` instances so you can customize objects even before they are created (kind off). If you
+want to short-circuit processing of your bean you can simply return `null` from postProcessor and
+processing chain will be broken which means no more of them will be applied.
+
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractAutowireCapableBeanFactory.java#L414[org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#applyBeanPostProcessorsBeforeInitialization]
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractAutowireCapableBeanFactory.java#L429[org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#applyBeanPostProcessorsAfterInitialization]
+
+[.lead]
+Sample usage
+
+We already know a bit on how it works now let’s try and implement something to take advantage of
+this interface. Imagine that you want to hack some measurements of your application performance. For
+the sake of example, we can do very naive implementation using just a couple of lines of code. Let's
+assume that I want to measure method execution times, but not all of them, just some of them
+annotated with following marker interface:
+
+{{<highlight java>}}
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Measured {
+    String DEFAULT_PERFORMANCE_LOGGER = "PERFORMANCE";
+
+    String value() default DEFAULT_PERFORMANCE_LOGGER;
+}
+{{</highlight>}}
+
+Not much is happening in here yet. It's just an interface which will be detected at runtime
+(`@Retention(RUNTIME)`) and can be applied on method level (`@Target(METHOD)`). We'll be using it to
+detect methods on which we'll be doing extra measurements.
+
+With this annotation in place we can already create very simple service:
+
+{{<highlight java>}}
+@Service
+class SampleService {
+    private static final Logger log = LoggerFactory.getLogger(SampleService.class);
+
+    @Measured
+    public void doWork(long sleepTime) {
+        try {
+            log.info("Starting work");
+            Thread.sleep(sleepTime);
+            log.info("Finishing work");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+{{</highlight>}}
+
+Annotation alone will not be enough, and it's not going to work by itself. We have to hack something
+extra which will allow us to detect those methods and somehow execute extra code around them. Well,
+spring does a lot of things like that. Have you ever wondered how transactional annotation works?
+Luckily spring provides abstractions that simplify a lot.
+
+Let's do baby steps and first of all find methods in which we are interested in:
+
+{{<highlight java>}}
+private boolean hasAnyMeasuredMethod(Object bean) {
+    return Stream
+            .of(ReflectionUtils.getAllDeclaredMethods(bean.getClass()))
+            .anyMatch(method -> AnnotationUtils.getAnnotation(method, Measured.class) != null);
+}
+{{</highlight>}}
+
+From this, we'll be able to tell if we should even consider this class as a candidate on which we'd
+like to do any processing.
+
+Now getting to a bit harder part - measurements itself. If we'd have to implement it by ourselves
+we'd probably just do something like this:
+
+{{<highlight java>}}
+public void doWork(long sleepTime) {
+    StopWatch stopWatch = new StopWatch();
+    stopWatch.start();
+    try {
+        // do things
+    } finally {
+        stopWatch.stop();
+        log.info("Execution took {}", stopWatch.getLastTaskTimeMillis());
+    }
+}
+{{</highlight>}}
+
+But the problem is that an instance of the object is already created. So we need to do something
+more complicated and somehow wrap the existing method with time measurements. We are already using
+spring and it comes with nice abstractions that allow us to do exactly that (no need to struggle
+with cglib ;)). Using `ProxyFactory` we can pretty easily introduce some AOP programming and do
+exactly what we need. Let’s write the implementation of `MethodInvocationInterceptor`:
+
+{{<highlight java>}}
+private static class MeasuringMethodInterceptor implements MethodInterceptor {
+    @Override
+    public Object invoke(MethodInvocation invocation) throws Throwable {
+        final Method method = invocation.getMethod();
+        final Measured annotation = AnnotationUtils.getAnnotation(method, Measured.class);
+        return annotation == null
+                ? invocation.proceed()
+                : proceedMeasured(invocation, annotation.value());
+    }
+
+    private Object proceedMeasured(MethodInvocation invocation, String loggerName) throws Throwable {
+        final Logger logger = LoggerFactory.getLogger(loggerName);
+        final StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+
+        try {
+            return invocation.proceed();
+        } finally {
+            stopWatch.stop();
+            logger.warn(
+                    "Execution of {} took {} ms",
+                    resolveLogMethod(invocation), stopWatch.getTotalTimeMillis());
+        }
+    }
+
+    private String resolveLogMethod(MethodInvocation invocation) {
+        return invocation.getMethod().getDeclaringClass().getCanonicalName() + "#" + invocation.getMethod().getName();
+    }
+}
+{{</highlight>}}
+
+A couple of things is happening in here so let's start from the beginning. Method interceptor is an
+Advice (`org.aopalliance.aop.Advice`) which is the base interface for all aspect-oriented things in
+spring. With `MethodInterceptor` we can easily write something that will allow us to intercept
+method invocation, modify the result or maybe do something extra around the method which is called.
+
+Firstly we examine if the method has annotation `@Measured` on it. If not just call it and
+forget about the whole thing. If not let's do exactly what we would have done if writing it
+manually.
+
+Now, all we have to do is take advantage of `ProxyFactory` available in spring and just wrap our
+class in a proxy and we are good to go.
+
+{{<highlight java>}}
+@Component
+class MeasuringBeanPostProcessor implements BeanPostProcessor {
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        if (hasAnyMeasuredMethod(bean)) {
+            return measuredProxy(bean);
+        }
+
+        return bean;
+    }
+
+    private Object measuredProxy(Object bean) {
+        ProxyFactory proxyFactory = new ProxyFactory(bean);
+        proxyFactory.addAdvice(new MeasuringMethodInterceptor());
+        return proxyFactory.getProxy();
+    }
+
+    private boolean hasAnyMeasuredMethod(Object bean) {
+        return Stream
+                .of(ReflectionUtils.getAllDeclaredMethods(bean.getClass()))
+                .anyMatch(method -> AnnotationUtils.getAnnotation(method, Measured.class) != null);
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/blog-example-beanpostprocessor/blob/master/src/main/java/com/pchudzik/blog/example/spring/internals/beanpostprocessor/MeasuringBeanPostProcessor.java[Complete
+implementation]. Note that there is ready to use implementation provided by spring
+https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-aop/src/main/java/org/springframework/aop/interceptor/PerformanceMonitorInterceptor.java#L37[org.springframework.aop.interceptor.PerformanceMonitorInterceptor]
+so you don’t really need to write one by yourself.
+
+Let’s quickly test (writing unit test for it is out of the scope of this post ;)) our solution and
+see how it’s working:
+
+{{<highlight java>}}
+@SpringBootApplication
+class BeanpostprocessorApplication {
+
+    public static void main(String[] args) {
+        final ConfigurableApplicationContext ctx = SpringApplication.run(BeanpostprocessorApplication.class, args);
+        final SampleService bean = ctx.getBean(SampleService.class);
+
+        for (int i = 0; i < 5; i++) {
+            bean.doWork(TimeUnit.SECONDS.toMillis(1000));
+        }
+    }
+}
+{{</highlight>}}
+
+And the logs from the execution:
+
+{{<highlight text>}}
+2019-02-11 19:15:56.717  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Starting work
+2019-02-11 19:15:57.720  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Finishing work
+2019-02-11 19:15:57.721  WARN 22856 --- [main] PERFORMANCE: Execution of com.pchudzik.blog.example.spring.internals.beanpostprocessor.SampleService#doWork took 1013 ms
+2019-02-11 19:15:57.723  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Starting work
+2019-02-11 19:15:58.728  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Finishing work
+2019-02-11 19:15:58.728  WARN 22856 --- [main] PERFORMANCE: Execution of com.pchudzik.blog.example.spring.internals.beanpostprocessor.SampleService#doWork took 1005 ms
+2019-02-11 19:15:58.728  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Starting work
+2019-02-11 19:15:59.731  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Finishing work
+2019-02-11 19:15:59.732  WARN 22856 --- [main] PERFORMANCE: Execution of com.pchudzik.blog.example.spring.internals.beanpostprocessor.SampleService#doWork took 1004 ms
+2019-02-11 19:15:59.732  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Starting work
+2019-02-11 19:16:00.733  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Finishing work
+2019-02-11 19:16:00.733  WARN 22856 --- [main] PERFORMANCE: Execution of com.pchudzik.blog.example.spring.internals.beanpostprocessor.SampleService#doWork took 1001 ms
+2019-02-11 19:16:00.733  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Starting work
+2019-02-11 19:16:01.736  INFO 22856 --- [main] c.p.b.e.s.i.b.SampleService: Finishing work
+2019-02-11 19:16:01.736  WARN 22856 --- [main] PERFORMANCE: Execution of com.pchudzik.blog.example.spring.internals.beanpostprocessor.SampleService#doWork took 1003 ms
+{{</highlight>}}
+
+Wasn’t so hard after all right? As you can see hacking something like that is actually pretty easy
+thing to do.
+
+[.small]
+I’m not responsible for any damage you’ll do on your production servers using this naive
+implementation :) Note the overhead of extra abstraction.
+
+[.lead]
+Interesting bean post processors
+
+To give you some ideas what you can achieve with this simple hook let’s take a look at a couple out
+of the box post processors that are registered by default:
+
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-context/src/main/java/org/springframework/context/support/ApplicationContextAwareProcessor.java#L61[org.springframework.context.support.ApplicationContextAwareProcessor] - simple hook that will inject `ApplicationContext` instance into beans.
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-context/src/main/java/org/springframework/context/support/ApplicationObjectSupport.java#L49[org.springframework.context.support.ApplicationListenerDetector] - register beans as `ApplicationListener` (`org.springframework.context.ApplicationListener`).
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-context/src/main/java/org/springframework/scheduling/annotation/AsyncAnnotationBeanPostProcessor.java#L65[org.springframework.scheduling.annotation.AsyncAnnotationBeanPostProcessor] - creates proxy around `@Async` methods so they get executed via `ExecutorService`.
+* https://github.com/spring-projects/spring-framework/blob/v5.1.4.RELEASE/spring-context/src/main/java/org/springframework/scheduling/annotation/ScheduledAnnotationBeanPostProcessor.java#L103[org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor] - hook which recognises `@Scheduled` methods of the bean when `@EnableScheduling` is applied.
+
+[.lead]
+Summary
+
+Next time you'd like to customize your bean after it's been created and you are using spring
+framework in your application you'll know that there is a hook designed to do exactly that. As you
+can see achieving things like measuring the execution time of particular methods is not so
+complicated (at least naive implementation of it). Spring offers a lot of convenient abstractions
+that allow to hook up into its internals and `BeanPostProcessor` is just one of them.
+
+[.small]
+* https://docs.spring.io/spring/docs/5.1.x/spring-framework-reference/core.html#beans-factory-extension[Extensive
+  documentation] off all official extensions points in spring
+* https://github.com/blog-pchudzik-examples/blog-example-beanpostprocessor[Complete examples].
