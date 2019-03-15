@@ -1,0 +1,199 @@
+---
+title: "Test naming convention"
+Tags: ["test", "testing", "spock"]
+Categories: ["best-practices"]
+description: "How to guarantee class naming conventions are met"
+date: "2019-03-14"
+---
+
+
+How to introduce automated checks that will guarantee that conventions are followed in an example of
+test naming convention. I’m going to focus on creating automated process that will verify if test
+names do match conventions. Automation will allow us to forget about the rule because the computer
+will ensure it’s followed. Test that I'm going to introduce will be living documentation inside the
+project and ensure no one will miss nor forget about the way we group tests.
+
+<!--more-->
+
+[.lead]
+TL;DR
+
+The best way to make sure rules are followed (if you commit to following them) is to create
+automation that will enforce and guarantee it. If possible always try to automate boring things like
+tests that check if conventions are met. When doing this you are killing two birds with one stone -
+you create automated rules checker (no need to bother with it on code review) and at the same time
+living documentation of the project.
+
+[.lead]
+The problem
+
+A while ago at work we decided it’s about time we split our tests into groups. For now, we decided
+to split them into two groups. Fast tests - clean unit tests executed in milliseconds. The second
+group comprises of integration tests - basically tests that do IO (database integration tests,
+external API integrations, reports generation, excel imports, etc).
+
+We decided that for now, we want to use a naming convention (no
+https://blog.pchudzik.com/201701/spock-groups/[@Category]) so it will be visible directly from the
+IDE which type of tests we are looking at. We didn’t want to introduce a separate source set to be
+used to separate test groups. We quickly renamed tests to match conventions we wanted to keep. But
+as quickly as we've renamed them we realised it will be hard to make sure everyone is following this
+convention (code review wasn’t going to be enough, we are usually more focused on the logic of tests
+than the name itself) because people tend to forget about not documented assumptions.
+
+I strongly believe that conventions that are meant to stay should be backed up by some kind of a
+process if possible automated one that will guarantee that all of the assumptions are met. This
+process should be executed with each build to guarantee that rules are followed (if you commit to
+something commit all the way).
+
+[.lead]
+Solution idea
+
+We decided to go with yet another integration test - naming convention test. The idea is that tests
+are executed as a part of the development process. If not on developer’s machine (I’m not going to
+throw stones here - we are putting functionalities in packages for some reason ;)) then as a part of
+the code review process (Gerrit verifier). We all agreed that it will be the simplest way to
+guarantee that tests are actually matching convention and it will be the easiest solution for a
+developer to use. Once we’ve written it we also discovered a couple of tests that weren’t matching
+convention just yet and we’ve missed them in initial renaming phase.
+
+[.lead]
+Solution
+
+The idea is simple. Grab everything from test sources, check if it is a test class (we don’t want to
+enforce this on test utilities) and in case test name doesn’t match assumptions just fail. The steps
+we must implement are clear so we can quickly jump right into the code and start implementing them.
+
+Lest’s start with finding all test classes:
+
+{{<highlight groovy>}}
+@TupleConstructor
+static class TestClassPathScanner {
+    private static final log = Logger.getLogger(TestClassPathScanner.class.getName())
+    private Collection<String> packages = []
+
+    public Set<Class> findAllTestClasses() {
+        return packages
+                .collect { findALlClasses(it) }
+                .flatten()
+                .toSet()
+    }
+
+    private Collection<Class> findALlClasses(String packageName) {
+        final classLoader = Thread.currentThread().getContextClassLoader()
+        return classLoader
+                .getResources(packageName.replace(".", File.separator)).toList()
+                .collect { new File(it.getFile()) }
+                .findAll { it.getAbsolutePath() ==~ /.*${File.separator}test.+classes${File.separator}.*/ }
+                .collect { findAllClasses(it, packageName) }
+                .flatten()
+                .toSet()
+    }
+
+    private Set<Class> findAllClasses(File directory, String packageName) {
+        if (!directory.exists()) {
+            return []
+        }
+
+        def result = []
+        for (def file in directory.listFiles()) {
+            if (file.isDirectory()) {
+                result += findAllClasses(file, packageName + "." + file.getName())
+            } else {
+                final clazz = tryToLoadClass(packageName, file.getName())
+                result += clazz ?: []
+            }
+        }
+
+        return result.toSet()
+    }
+
+    private Class tryToLoadClass(String packageName, String fileName) {
+            final className = packageName + "." + fileName.replaceAll(/.class$/, "")
+            try {
+                return Class.forName(className)
+            } catch (ClassNotFoundException | LinkageError ex) {
+                handleClassInitializationError(fileName, ex)
+            }
+        }
+
+    private void handleClassInitializationError(String fileName, Throwable ex) {
+        //for example when there is an error while initializing static field
+        log.warning("Ignoring class ${fileName}. Error while loading class ${ex.message}")
+    }
+}
+{{</highlight>}}
+
+Once we have the collection of test classes we should focus only on actual tests and exclude all
+test utilities (we don’t have to create conventions for them):
+
+{{<highlight groovy>}}
+static class TestClassDetector {
+    static isTestClass(Class clazz) {
+        return Specification.class.isAssignableFrom(clazz) || isJunitTest(clazz)
+    }
+
+    private static boolean isJunitTest(Class clazz) {
+        return hasAnyTestMethods(clazz) || isJunitTestSuite(clazz)
+    }
+
+    private static boolean isJunitTestSuite(Class clazz) {
+        return Objects.nonNull(AnnotationUtils.findAnnotation(clazz, Suite.SuiteClasses.class))
+    }
+
+    private static boolean hasAnyTestMethods(Class clazz) {
+        return Objects.nonNull(ReflectionUtils
+                .getAllDeclaredMethods(clazz)
+                .find { AnnotationUtils.findAnnotation(it, Test.class) != null })
+    }
+}
+{{</highlight>}}
+
+Now the formality - check if test names do match assumed conventions:
+
+{{<highlight groovy>}}
+class TestNamingConventionITest extends Specification {
+    private static final testNamesConventions = [/.*Test$/, /.*ITest$/]
+
+    def "tests names match convention"() {
+        given:
+        final allTestClasses = new TestClassPathScanner(packages: ["com.pchudzik"] as Set)
+                .findAllTestClasses()
+                .findAll { TestClassDetector.isTestClass(it) }
+
+        when:
+        final classesNotMatchingConventionTest = allTestClasses.findAll { breaksTestConventionName(it) }
+
+        then:
+        classesNotMatchingConventionTest.isEmpty()
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/conventions-testnames/blob/master/src/test/groovy/com/pchudzik/blog/example/conventions/testnaming/TestNamingConventionITest.groovy[Complete source code]
+
+[.lead]
+Next steps
+
+What we’ve built is working for us. But it’s not yet perfect. In case of problems with mixing up
+slow and fast tests names, we should introduce a time limit in which fast tests must finish to
+guarantee that any integration tests will not become unit test by mistake. Also if there is a way to
+automatically detect if the test is for example integration test (maybe it inherits from some class,
+or uses some specific annotations - like for example @Autowired) then we should also incorporate
+those rules into checking process.
+
+[.lead]
+Summary
+
+Conventions are a very good thing as long as they are followed. They help to guarantee that the same
+standards are kept across all of the project files. It is important to have some rules on which team
+has agreed on and committed on following. If you want to have some rules or conventions that will
+last the easiest way is to create a process that will guarantee agreements are met. We are not so
+good at following processes and remembering all of the rules that’s why introducing automation on
+things that can be automated is the best investment you can do. The computer will not get bored with
+the task and will not complain that he has to do it again and again.
+
+By writing this simple test we've produced an automated rule check which is also living
+documentation. All code must match conventions and once the rule is broken the developer is notified
+what is broken and what are the rules. The best thing is that this documentation will live with the
+project and will not be some forgotten confluence page.
