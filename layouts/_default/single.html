@@ -16,6 +16,20 @@
           {{end}} 
           </p>
           <p>{{ .Content }}</p>
+          <div>
+            {{ $related := .Site.RegularPages.Related . | first 5 }}
+            {{ with $related }}
+              <div class="paragraph lead">See Also</div>
+              <div class="paragraph">
+                <p>If you've enjoyed or found this post useful you might also like:</p>
+              </div>
+              <ul>
+                {{ range . }}
+                  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+                {{ end }}
+              </ul>
+            {{ end }}
+          </div>
           <p>{{ .Date.Format "2 Jan 2006" }}
             {{if .Params.tags }}
               {{ range $index, $tag := .Params.tags }}

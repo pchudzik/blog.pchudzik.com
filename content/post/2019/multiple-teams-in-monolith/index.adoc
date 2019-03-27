@@ -27,7 +27,7 @@ tl;dr
 * from master create release candidate branch
 
 [.center-image]
-image::/post/2019/multiple-teams-in-monolith/branches.jpg[Branches]
+image::branches.jpg[Branches]
 
 [.lead]
 Assumptions
@@ -94,7 +94,7 @@ this point, it looks pretty standard we’ve just changed branch name from `mast
 
 
 [.center-image]
-image::/post/2019/multiple-teams-in-monolith/ship-it.jpg[Ship it!]
+image::ship-it.jpg[Ship it!]
 
 Things are getting a bit more complicated with release. A person marked as release manager aligns
 with teams and QA team on what is ready for the release (at this point it is ok for the team to say
