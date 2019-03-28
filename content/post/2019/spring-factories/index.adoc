@@ -1,0 +1,209 @@
+---
+title: "spring.factories"
+Tags: ["test", "spring", "springmock"]
+Categories: ["java"]
+description: "spring.factories file and for what it's used"
+date: "2019-03-28"
+---
+
+Have you ever wondered how it's possible that spring-boot is able to pick up whatever you have on
+the classpath and configure application context to your needs based on some conventions and bit of
+black magic? In this post, I’m going to dig into `spring.factories` file on which most of the
+spring-boot power is based.
+
+<!--more-->
+
+[.lead]
+TL;DR
+
+`META-INF/spring.factories` file is a special file picked up by the spring framework in which you
+can define how spring context will be customized.
+https://docs.spring.io/spring-boot/docs/2.2.x/reference/html/spring-boot-features.html#boot-features-understanding-auto-configured-beans[Documentation]
+and
+https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/resources/META-INF/spring.factories[spring-boot’s
+spring.factories].
+
+[.lead]
+But why?
+
+In old days (before spring-boot project) one had to configure context by hand. You had to be aware
+of what’s required for your application. What parts of the spring you’ll need, what database type
+you’ll be using and for each of those prepare some xml configuration (java configuration was
+introduced in spring 3.x). With spring-boot things has changed. The troublesome and laborious
+process of configuring projects has been replaced by conventions and classpath scanning.
+Implementing such a mechanism can be easy but only if you deliver your framework as one huge blob
+that must be included with the project. Luckily (I’ve seen blobs…) spring-boot developers decided
+that they’ll ship highly specialized modules and you’ll be free to include only what’s necessary for
+you. With `spring.factories` file they are able to achieve exactly that. Each module can provide
+it's own configuration which later will be merged and will comprise on spring context.
+
+[.center-image]
+image::spring-factories.jpg[Factory]
+
+[.lead]
+How?
+
+Let’s start with spring itself. `spring.factories` file support has been added in version 3.2 of the
+framework (quite old feature) -
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-core/src/main/java/org/springframework/core/io/support/SpringFactoriesLoader.java[`SpringFactoriesLoader`].
+From version 4.2 it’s possible to define
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/ContextCustomizerFactory.java[`ContextCustomizerFactory`]
+which will be picked up during context initialization
+(https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/support/AbstractTestContextBootstrapper.java#L420[`AbstractTestContextBootstrapper#getContextCustomizerFactories`]).
+In spring this mechanism is used only while setting up test context
+(https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/BootstrapWith.java[`BootstrapWith`]). It’s existence though opened a way to customize it
+even further in spring-boot. Authors of spring-boot were able to create extension points which can
+be added by convention and can be injected without extending framework code itself.
+
+In case of the spring-boot usages of factories loading are spread in many places of the project, but
+you can start looking from constructor of
+https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/SpringApplication.java#L268[`SpringApplication`]
+which loads
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-context/src/main/java/org/springframework/context/ApplicationContextInitializer.java[`ApplicationContextInitializer`]
+and
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-context/src/main/java/org/springframework/context/ApplicationListener.java[`ApplicationListners`].
+From there when the context is initialized other configurations and cusomzers are loaded. Most
+automagical classes in spring-boot are loaded only if some specific classes are on the classpath.
+This is achieved from
+https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/AutoConfigurationImportSelector.java#L179[`AutoConfigurationImportSelector#getCandidateConfigurations`]
+which scans `spring.factories` looking for
+https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.java[`EnableAutoConfiguration`]
+property values and from there those configurations unless excluded and enabled are loaded.
+
+[.lead]
+Possible entries in spring-core project
+
+* https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/TestExecutionListener.java[`org.springframework.test.context.TestExecutionListener`]
+* https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/ContextCustomizer.java[`org.springframework.test.context.ContextCustomizer`]
+* https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-beans/src/main/java/org/springframework/beans/BeanInfoFactory.java[`org.springframework.beans.BeanInfoFactory`]
+
+[.lead]
+Possible entries in spring-boot project
+
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/env/PropertySourceLoader.java[`org.springframework.boot.env.PropertySourceLoader`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/SpringApplicationRunListener.java[`org.springframework.boot.SpringApplicationRunListener`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/SpringBootExceptionReporter.java[`org.springframework.boot.SpringBootExceptionReporter`]
+* https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-context/src/main/java/org/springframework/context/ApplicationContextInitializer.java[`org.springframework.context.ApplicationContextInitializer`]
+* https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-context/src/main/java/org/springframework/context/ApplicationListener.java[`org.springframework.context.ApplicationListener`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/env/EnvironmentPostProcessor.java[`org.springframework.boot.env.EnvironmentPostProcessor`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/diagnostics/FailureAnalyzer.java[`org.springframework.boot.diagnostics.FailureAnalyzer`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/diagnostics/FailureAnalysisReporter.java[`org.springframework.boot.diagnostics.FailureAnalysisReporter`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/AutoConfigurationImportListener.java[`org.springframework.boot.autoconfigure.AutoConfigurationImportListener`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/AutoConfigurationImportFilter.java[`org.springframework.boot.autoconfigure.AutoConfigurationImportFilter`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.java[`org.springframework.boot.autoconfigure.EnableAutoConfiguration`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/template/TemplateAvailabilityProvider.java[`org.springframework.boot.autoconfigure.template.TemplateAvailabilityProvider`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/web/ManagementContextConfiguration.java[`org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration`]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.3.RELEASE/spring-boot-project/spring-boot-test/src/main/java/org/springframework/boot/test/context/DefaultTestExecutionListenersPostProcessor.java[`org.springframework.boot.test.context.DefaultTestExecutionListenersPostProcessor`]
+
+[.lead]
+What can we do?
+
+To give you some idea for what it can be used let’s examine
+https://github.com/pchudzik/springmock[spring-mock] library. It allows to inject Spock native mocks
+spring integration tests (written in Spock). In current Spock's version basic support for this has
+already been added (library provides more configuration options), using the same approach.
+
+When I was working on the spring-mock library I needed a way to tell spring that I’ll need to do
+some extra work when booting up the context. In
+https://github.com/pchudzik/springmock/blob/master/spock/src/main/resources/META-INF/spring.factories[`spring.factories`]
+I’ve configured support for custom annotations and registry that allowed to dynamically register
+beans in test spring context. I didn’t want users to be aware of all of the internal that’s why I’ve
+implemented
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/ContextCustomizerFactory.java[`ContextCustomizerFactory`]
+and
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/TestExecutionListener.java[`TestExecutionListener`]
+and with this all internals are hidden from user.
+
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/TestExecutionListener.java[`TestExecutionListener`]
+is a bit simpler so let’s start with it. As you probably already know Spock mocks are basically
+bound to the test that is being executed. Before mock can be used it must be attached to the test
+instance. And that’s basically what my test execution listener does. It attaches all registered
+mocks and spies to test instance and once the test is done it detaches them from test instance.
+
+{{<highlight java>}}
+// ...
+@Override
+public void beforeTestMethod(TestContext testContext) throws Exception {
+    final Object testInstance = testContext.getTestInstance();
+    if (!(testInstance instanceof Specification)) {
+        return;
+    }
+
+    final Specification specification = (Specification) testInstance;
+    final List<Object> mocks = new LinkedList<>();
+    final ApplicationContext applicationContext = testContext.getApplicationContext();
+    final DoubleRegistry doubleRegistry = applicationContext.getBean(DoubleRegistry.BEAN_NAME, DoubleRegistry.class);
+
+    for (DoubleDefinition doubleDefinition : doubleRegistry.doublesSearch()) {
+        final Optional<Object> doubleBean = tryToGetBean(applicationContext, doubleDefinition);
+
+        doubleBean.ifPresent(bean -> {
+            mocks.add(bean);
+            mockUtil.attachMock(bean, specification);
+        });
+    }
+
+    testContext.setAttribute(MOCKED_BEANS_NAMES, mocks);
+}
+
+@Override
+public void afterTestMethod(TestContext testContext) throws Exception {
+    getMocksFromContext(testContext).forEach(mockUtil::detachMock);
+}
+// ...
+{{</highlight>}}
+
+[.small]
+https://github.com/pchudzik/springmock/blob/master/spock/src/main/java/com/pchudzik/springmock/spock/spring/MockAttachingTestExecutionListener.java[Full source]
+
+Using
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-test/src/main/java/org/springframework/test/context/ContextCustomizerFactory.java[`ContextCustomizerFactory`]
+we can achieve much more. To allow users to inject mocks I’ve decided to use completely new
+annotation (I didn’t want to cause any conflicts with existing mechanisms in spring-boot). So I had
+to find all the fields annotated with my custom annotation, register those as standard spring-beans
+so they can be injected into other beans and into the test. ContextCustomizer is something that
+allows you to do things like that. You have access to ConfigurableApplicationContext and
+MergedContextConfiguration from there you can do virtually anything with spring context.
+
+{{<highlight java>}}
+public final void customizeContext(ConfigurableApplicationContext configurableApplicationContext, MergedContextConfiguration mergedContextConfiguration) {
+    final BeanDefinitionRegistry registry = (BeanDefinitionRegistry) configurableApplicationContext;
+
+    registerDoubleRegistry(registry);
+    registerDoubleFactory(configurableApplicationContext.getBeanFactory(), registry);
+    registerMockClassResolver(registry);
+
+    registerDoubleDefinitionRegisteringProcessor(registry);
+    registerSpyRegistrationPostProcessor(registry);
+
+    registerAdditionalBeanDefinitions(registry, additionalDefinitions);
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/pchudzik/springmock/blob/master/infrastructure/src/main/java/com/pchudzik/springmock/infrastructure/spring/MockContextCustomizer.java#L46[Full source]
+
+Here I’m registering some internals of spring-mock library (registers for all mocks and spies used
+in test context).
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/config/BeanFactoryPostProcessor.java[`BeanFactoryPostProcessor`]
+which will register mocks and spies as native spring beans.
+
+The whole mechanism is a bit complex so I’m not going to go any deeper with it you are interested I
+encourage you to just clone the library and investigate it by yourself you already know what’s the
+entry point and where to start. Or if you are interested in spring boot internals just put a break
+point on
+https://github.com/spring-projects/spring-framework/blob/v5.1.5.RELEASE/spring-core/src/main/java/org/springframework/core/io/support/SpringFactoriesLoader.java[SpringFactoriesLoader].
+
+My project was focused mostly on testing but by looking on what’s been added to the spring-boot
+number of possible extension points is huge and more of those can be added without a lot of effort.
+
+
+[.lead]
+Summary
+
+`spring.factories` is a very powerful file which allows to customize spring-context. Knowledge about
+this file might become very handy if you’ll ever need to extend spring capabilities (always check
+google first, there is a chance someone already implemented it for you ;)). In most cases, you'll
+get away even without knowledge about this file but I think it’s good to know extension points of
+the framework you are using for most of your applications and how to take advantage of the hooks.
+
