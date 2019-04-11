@@ -1,6 +1,6 @@
 ---
 title: "Test naming convention"
-Tags: ["test", "testing", "spock"]
+Tags: ["testing", "spock"]
 Categories: ["best-practices"]
 description: "How to guarantee class naming conventions are met"
 date: "2019-03-14"

@@ -1,6 +1,6 @@
 ---
 title: "spring.factories"
-Tags: ["test", "spring", "springmock"]
+Tags: ["testing", "spring", "springmock"]
 Categories: ["java"]
 description: "spring.factories file and for what it's used"
 date: "2019-03-28"
