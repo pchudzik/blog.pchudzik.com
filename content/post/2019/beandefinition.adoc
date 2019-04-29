@@ -1,0 +1,268 @@
+---
+title: "Spring internals - BeanDefinition"
+Tags: ["java", "spring"]
+Categories: ["java"]
+description: "BeanDefinition in spring how it's used and how to customize it"
+date: "2019-04-29"
+---
+
+How beans are registered in spring and what is the base of beans creation, how to extend spring's
+context to our needs? In this post, I’m going to dig into the foundation of many mechanics in spring
+framework - bean definition.
+
+<!--more-->
+
+[.lead]
+Interfaces
+
+Before starting let’s get familiar with a couple of interfaces that are building blocks of what
+we’ll be looking into.
+
+{{<highlight java>}}
+public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
+	String SCOPE_SINGLETON = ConfigurableBeanFactory.SCOPE_SINGLETON;
+	String SCOPE_PROTOTYPE = ConfigurableBeanFactory.SCOPE_PROTOTYPE;
+
+	int ROLE_APPLICATION = 0;
+	int ROLE_SUPPORT = 1;
+	int ROLE_INFRASTRUCTURE = 2;
+
+	void setParentName(@Nullable String parentName);
+	String getParentName();
+
+	void setBeanClassName(@Nullable String beanClassName);
+	String getBeanClassName();
+
+	void setScope(@Nullable String scope);
+	String getScope();
+
+	void setLazyInit(boolean lazyInit);
+	boolean isLazyInit();
+
+	void setDependsOn(@Nullable String... dependsOn);
+	String[] getDependsOn();
+
+	void setAutowireCandidate(boolean autowireCandidate);
+	boolean isAutowireCandidate();
+
+	void setPrimary(boolean primary);
+	boolean isPrimary();
+
+	void setFactoryBeanName(@Nullable String factoryBeanName);
+	String getFactoryBeanName();
+
+	void setFactoryMethodName(@Nullable String factoryMethodName);
+	String getFactoryMethodName();
+
+	ConstructorArgumentValues getConstructorArgumentValues();
+
+	default boolean hasConstructorArgumentValues() {
+		return !getConstructorArgumentValues().isEmpty();
+	}
+
+	MutablePropertyValues getPropertyValues();
+	default boolean hasPropertyValues() {
+		return !getPropertyValues().isEmpty();
+	}
+
+	void setInitMethodName(@Nullable String initMethodName);
+	String getInitMethodName();
+
+	void setDestroyMethodName(@Nullable String destroyMethodName);
+	String getDestroyMethodName();
+
+	void setRole(int role);
+	int getRole();
+
+	void setDescription(@Nullable String description);
+	String getDescription();
+
+	boolean isSingleton();
+	boolean isPrototype();
+	boolean isAbstract();
+	String getResourceDescription();
+	BeanDefinition getOriginatingBeanDefinition();
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/spring-projects/spring-framework/blob/v5.1.6.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/config/BeanDefinition.java[Full source]
+
+Just by reading method names of this interface, you should get a general idea for what it is used.
+Many of those methods are directly used to create bean definitions from annotations (or XML). When
+spring context is starting in the first step it scans all places (XML, classes) for beans that
+you've registered and BeanDefinitions are results of this processing step. Detected definitions are
+registered in BeanDefinitionRegistry.
+
+{{<highlight java>}}
+public interface BeanDefinitionRegistry extends AliasRegistry {
+
+	void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
+			throws BeanDefinitionStoreException;
+
+	void removeBeanDefinition(String beanName) throws NoSuchBeanDefinitionException;
+
+	BeanDefinition getBeanDefinition(String beanName) throws NoSuchBeanDefinitionException;
+
+	boolean containsBeanDefinition(String beanName);
+
+	String[] getBeanDefinitionNames();
+
+	int getBeanDefinitionCount();
+
+	boolean isBeanNameInUse(String beanName);
+}
+{{</highlight>}}
+https://github.com/spring-projects/spring-framework/blob/v5.1.6.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/support/BeanDefinitionRegistry.java[Full source]
+
+In spring BeanDefinitionRegistry is implemented inside application context class and is responsible
+for gathering all bean definitions and at a later stage for creating beans out of them.
+
+[.lead]
+Usage - dynamic bean registration
+
+https://blog.pchudzik.com/201705/dynamic-beans/[I’ve already described how you can dynamically
+register beans in spring]. Here is most important piece of code:
+
+{{<highlight java>}}
+@RequiredArgsConstructor
+class DynamicBeanExample {
+  private final String beanId;
+  private final TestDependency testDependency;
+}
+
+@Component
+class SingleDynamicBeanProcessor implements BeanFactoryPostProcessor {
+  @Override
+  public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+    final BeanDefinitionRegistry beanDefinitionRegistry = (BeanDefinitionRegistry) beanFactory;
+    final BeanDefinition dynamicBean = BeanDefinitionBuilder
+        .rootBeanDefinition(DynamicBeanExample.class)
+        .setScope(SCOPE_PROTOTYPE)
+        .addConstructorArgValue("dynamically created bean")
+        .getBeanDefinition();
+
+    beanDefinitionRegistry.registerBeanDefinition("dynamicBean", dynamicBean);
+  }
+}
+{{</highlight>}}
+
+[.small]
+Exactly the same thing can be achieved using BeanDefinitionRegistryPostProcessor.
+
+[.lead]
+Usage - bean definition customization
+
+We are not limited only to registering new beans using these mechanics. We can achieve much more and
+customize already registered beans using
+https://github.com/spring-projects/spring-framework/blob/v5.2.0.M1/spring-beans/src/main/java/org/springframework/beans/factory/support/BeanDefinitionRegistryPostProcessor.java[BeanDefinitionRegistryPostProcessor]
+and/or allow spring to create bean definition for us and then customize it using
+BeanDefinitionCustomizer.
+
+Let's start with BeanDefinitionRegistryPostProcessor. Imagine you are registering some beans but for
+any reason, under some circumstances, you want to unregister or replace previously registered bean
+with something else before it is created. With BeanDefinitionRegistryPostProcessor you can do
+exactly that and a bit more as you have access to bean definition itself and can modify it.
+
+{{<highlight java>}}
+@SpringBootApplication
+public class BeanDefinitionRegistryPostProcessorApplication {
+
+    public static void main(String[] args) {
+        ConfigurableApplicationContext appCtx = SpringApplication.run(BeanDefintionCustomizerApplication.class, args);
+        System.out.println("\n\n");
+
+        final SomeInterface bean = appCtx.getBean(SomeInterface.class);
+        bean.doWork();
+    }
+
+    interface SomeInterface {
+        void doWork();
+    }
+
+    @Component
+    static class PostProcessor implements BeanDefinitionRegistryPostProcessor {
+        @Override
+        public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry beanDefinitionRegistry) throws BeansException {
+            beanDefinitionRegistry.removeBeanDefinition("myService");
+            beanDefinitionRegistry.registerBeanDefinition(
+                    "myService",
+                    genericBeanDefinition(TestService.class).getBeanDefinition());
+        }
+
+        @Override
+        public void postProcessBeanFactory(ConfigurableListableBeanFactory configurableListableBeanFactory) throws BeansException {
+        }
+    }
+
+    @Component("myService")
+    static class MyService implements SomeInterface {
+        public MyService() {
+            System.out.println("Creating service");
+        }
+
+        @Override
+        public void doWork() {
+            System.out.println("Working hard...");
+        }
+    }
+
+    static class TestService implements SomeInterface {
+
+        @Override
+        public void doWork() {
+            System.out.println("Doing nothing");
+        }
+    }
+}
+{{</highlight>}}
+
+This is a very exaggerated example but it shows what you can achieve with this interface. If you are
+interested in more examples you can always investigate:
+
+* https://github.com/spring-projects/spring-boot/blob/v2.1.4.RELEASE/spring-boot-project/spring-boot-test-autoconfigure/src/main/java/org/springframework/boot/test/autoconfigure/jdbc/TestDatabaseAutoConfiguration.java#L82[EmbeddedDataSourceBeanFactoryPostProcessor]
+* https://github.com/spring-projects/spring-boot/blob/v2.1.4.RELEASE/spring-boot-project/spring-boot-test/src/main/java/org/springframework/boot/test/web/client/TestRestTemplateContextCustomizer.java#L95[TestRestTemplateRegistrar]
+
+There is also
+https://github.com/spring-projects/spring-framework/blob/v5.1.6.RELEASE/spring-beans/src/main/java/org/springframework/beans/factory/config/BeanDefinitionCustomizer.java[BeanDefinitionCustomizer]
+which allows customization of bean creation process but it's not part of any public interface yet
+and in order to use it you have to use a concrete implementation of ApplicationContext:
+
+{{<highlight java>}}
+@SpringBootApplication
+public class BeanDefinitionCustomizerApplication {
+
+    public static void main(String[] args) {
+        final GenericApplicationContext appCtx = (GenericApplicationContext) SpringApplication.run(BeanDefinitionCustomizerApplication.class, args);
+        appCtx.registerBean(Service.class, beanDefinition -> beanDefinition.setScope(BeanDefinition.SCOPE_PROTOTYPE));
+        System.out.println("\n\n");
+
+        final Service first = appCtx.getBean(Service.class);
+        final Service second = appCtx.getBean(Service.class);
+    }
+
+    static class Service {
+        public Service() {
+            System.out.println("Creating service");
+        }
+
+        void doWork() {
+            System.out.println("Working hard...");
+        }
+    }
+}
+{{</highlight>}}
+
+To take advantage of this interface you have to use GenericApplicationContext which is not so
+exotic, but still forces you to use a concrete implementation of ApplicationContext. On the other
+hand it gives you some extra possibilities for bean registration and customization so it's up to you
+to decide if you want to use it.
+
+[.lead]
+Summary
+
+As you see bean definitions are very customizable and there are a couple of extensions points in
+which we can expand capabilities of spring context. At some point, you might want to register beans
+in spring dynamically or customize beans picked by spring. With a basic knowledge about bean
+definition concept you'll be able to take advantage of this abstraction and extension points
+available in spring framework.
