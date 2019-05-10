@@ -1,0 +1,171 @@
+---
+title: "My first maven plugin"
+Tags: ["mvn"]
+Categories: ["java"]
+description: "How to write your first maven plugin"
+date: "2019-05-10"
+---
+
+In the past, I’ve been doing various things with maven. Some of them were standard, some were more
+complicated and a couple of them were complex. For those complex solutions, I felt like I needed a
+plugin but I’ve never had enough time to write it properly. In this post, I’m going to explore the
+basics of writing maven plugin.
+
+<!--more-->
+
+When developing custom build solutions/workarounds I’ve never had a chance to investigate how to
+write proper maven plugin. Because of that my way to go solution was to use Gradle and if not
+possible to write a Groovy script that will do exactly what I need and execute it with
+groovy-maven-plugin using https://groovy.github.io/gmaven/groovy-maven-plugin/execute.html[execute
+goal]. This approach is working, it's easy and fast to develop, but usually, it feels like a
+workaround...
+
+In maven, one can develop plugins which extend the behavior of particular lifecycle phases and I’ve
+never written one... I’ve decided it’s about time to give it a try and write plugin on my own. In
+this post, we’ll do just the basics so you can bootstrap your own plugin really quick, as it turns
+out doing more advanced things is just a matter of your java code, not maven infrastructure.
+
+First of all, we have to declare that the packing of the project will be maven-plugin like this:
+
+{{<highlight xml>}}
+<packaging>maven-plugin</packaging>
+{{</highlight>}}
+
+Let’s start with dependencies that are required and simplify your life:
+
+{{<highlight xml>}}
+<dependency>
+    <groupId>org.apache.maven</groupId>
+    <artifactId>maven-plugin-api</artifactId>
+    <version>3.6.1</version>
+</dependency>
+<dependency>
+    <groupId>org.apache.maven.plugin-tools</groupId>
+    <artifactId>maven-plugin-annotations</artifactId>
+    <version>3.4</version>
+    <scope>provided</scope>
+</dependency>
+{{</highlight>}}
+
+Those will provide basic API classes and interfaces along with annotations required for plugin
+development. Next is the plugin that generates help goal and documentation from created
+https://maven.apache.org/general.html#What_is_a_Mojo[Mojo]:
+
+{{<highlight xml>}}
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-plugin-plugin</artifactId>
+    <version>3.6.0</version>
+    <executions>
+        <execution>
+            <id>default-descriptor</id>
+            <phase>process-classes</phase>
+        </execution>
+        <execution>
+            <id>help-goal</id>
+            <goals>
+                <goal>helpmojo</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/blog-example-sample-maven-plugin/blob/master/pom.xml[complete pom.xml]
+
+With those configured all is left is to actually write plugin logic:
+
+{{<highlight java>}}
+@Mojo(name = "greeting", defaultPhase = LifecyclePhase.INITIALIZE)
+public class SimplestPlugin extends AbstractMojo {
+    @Parameter(required = true)
+    private String name;
+
+    @Override
+    public void execute() throws MojoExecutionException, MojoFailureException {
+        getLog().info("Hello " + name);
+    }
+}
+{{</highlight>}}
+
+The plugin does nothing special and it’s up to you to add extra logic to it. @Mojo allows to
+basically declare a goal. You can easily pass parameters from pom.xml to the plugin using
+http://maven.apache.org/guides/plugin/guide-java-plugin-development.html#Parameters[@Parameter]
+annotation. The field name will be parameter name (or you can use alias property) and inside execute
+method there is a place for your logic.
+
+Once we’ve finally deployed (or installed in this case ;)) the plugin we can finally use this plugin
+we have to declare it in build/plugins section as follows:
+
+{{<highlight xml>}}
+<plugin>
+    <groupId>com.pchudzik.blog.example</groupId>
+    <artifactId>sample-maven-plugin</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>greeting</goal>
+            </goals>
+        </execution>
+    </executions>
+    <configuration>
+        <name>Pawel</name>
+    </configuration>
+</plugin>
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/blog-example-sample-maven-plugin/blob/master/sample-usage/pom.xml[complete pom.xml]
+
+And we can easily verify if it’s executed:
+
+{{<highlight text>}}
+$ mvn clean compile
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Building sample-maven-plugin-usage 1.0-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+[INFO]
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ sample-maven-plugin-usage ---
+[INFO] Deleting /Users/pawel/Workspace/blog-examples/sample-maven-plugin/sample-usage/target
+[INFO]
+[INFO] --- sample-maven-plugin:1.0-SNAPSHOT:greeting (default) @ sample-maven-plugin-usage ---
+[INFO] Hello Pawel
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ sample-maven-plugin-usage ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 0 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ sample-maven-plugin-usage ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 1 source file to /Users/pawel/Workspace/blog-examples/sample-maven-plugin/sample-usage/target/classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.117 s
+[INFO] Finished at: 2019-05-06T08:19:05+02:00
+[INFO] Final Memory: 15M/303M
+[INFO] ------------------------------------------------------------------------
+{{</highlight>}}
+
+There is a couple of links that you should know of, you'll find a lot of valuable information
+there:
+
+* http://maven.apache.org/developers/mojo-api-specification.html
+* http://maven.apache.org/guides/plugin/guide-java-plugin-development.html
+* http://maven.apache.org/guides/plugin/guide-java-report-plugin-development.html
+* http://maven.apache.org/plugin-developers/common-bugs.html
+
+That’s all you need to write the simplest plugin possible. I wanted to explore the basics before
+jumping head into it. I wasn't sure what to expect from maven plugin API but it turns out writing
+plugin on your own is not complicated nor cumbersome. In the future instead of the groovy script
+I’ll probably go for a plugin based solution because you can properly test the logic and decouple
+build logic from the project code itself.
+
+[.small]
+As always project can be found
+https://github.com/blog-pchudzik-examples/blog-example-sample-maven-plugin[on my github].
