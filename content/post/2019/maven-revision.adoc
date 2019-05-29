@@ -1,0 +1,152 @@
+---
+title: "Simplified application versioning with maven"
+Tags: ["mvn"]
+Categories: ["java"]
+description: "New ${revision} property available in maven!"
+date: "2019-05-29"
+---
+
+Version management in maven (especially in multi-module projects) was not pleasant and required
+multiple build steps, some magic commands and maybe bash script here and there. With version 3.5.0
+new cool feature has been added to maven. From https://maven.apache.org/maven-ci-friendly.html[this
+version] you can easily customize your build number from build tools using simple properties like
+`${revision}` `${sha1}` and `${changelist}`.
+
+<!--more-->
+
+[.lead]
+TL;DR
+
+You can define and/or pass following properties ${revision} ${sha1} and ${changelist} and safely use
+them in version tag of your project.
+
+[.lead]
+Prerequisites
+
+Before you even start thinking about versioning you should consider using
+https://semver.org[Semantic Versioning] as a base for your releases. If you are not, it should be
+your conscious decision.
+
+[.lead]
+The problem
+
+With previous maven versions, it’s always been painful to manage project version especially if you
+had multiple modules in your project. In the past, my way to go solution was
+https://www.mojohaus.org/versions-maven-plugin/[maven version plugin] with its
+https://www.mojohaus.org/versions-maven-plugin/set-mojo.html[versions:set] goal which allowed to
+bump project version. It is working but results in changes in many files and it always requires
+googling or checking bash history in order to find the spell required to bump project version.
+
+When working with maven and managing project version my first go to idea was to basically have
+somewhere in your project bash script that removed `-SNAPSHOT` from the project version and then
+bumped the last number by 1 and added `-SNAPSHOT` suffix again. Preferably using maven versions
+plugin. This resulted in the quite complex build script and complicated release process which I’m
+not even going to explain now since it’s outdated :)
+
+The second idea was to allow a user to fill in version during build/deployment process (current date
+or build number by default for example) and just set it using version plugin. This one is even more
+complicated as it requires human interaction which leaves space for error…
+
+[.lead]
+The solution shipped with new maven
+
+New properties have been added to maven (`${revision}` `${sha1}` and `${changelist}`) and you can
+use them in version tag of your project. You can set it in project properties (properties tag), pass
+it from the command line or even store them in external file `.mvn/maven.config`. With this, your
+project version is set in a single place (in many multi-module projects all modules are released as
+single version). It can be even decoupled from your pom file…
+
+[.lead]
+Samples
+
+Let’s start with parent pom:
+{{<highlight xml>}}
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.pchudzik.blog.example</groupId>
+  <artifactId>maven-revision</artifactId>
+  <version>${revision}</version>
+
+  <modules>
+    <module>project1</module>
+    <module>project2</module>
+  </modules>
+
+  <name>maven-revision</name>
+  <packaging>pom</packaging>
+
+  <properties>
+    <revision>1.0.0-SNAPSHOT</revision>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
+
+</project>
+{{</highlight>}}
+
+And two submodules. Project 1:
+{{<highlight xml>}}
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>maven-revision</artifactId>
+        <groupId>com.pchudzik.blog.example</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>project1</artifactId>
+
+    <name>project1</name>
+</project>
+{{</highlight>}}
+
+And Project 2:
+{{<highlight xml>}}
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>maven-revision</artifactId>
+        <groupId>com.pchudzik.blog.example</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>project2</artifactId>
+
+    <name>project2</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.pchudzik.blog.example</groupId>
+            <artifactId>project1</artifactId>
+            <version>${revision}</version>
+        </dependency>
+    </dependencies>
+</project>
+{{</highlight>}}
+
+So after a clean package (or install or deploy) project version will be set to `1.0.0-SNAPSHOT` as
+it is defined in parent pom’s properties. We can easily customize it using `mvn clean package
+-Drevision=2.0.0`. That’s pretty handy when used with CI tools. If you want to decouple project
+version from all you have to do is remove revision from properties and define it in
+`mvn/maven.config` in the following way: `-Drevision=1.5.0-SNAPSHOT`
+(https://github.com/blog-pchudzik-examples/blog-example-maven-revision/blob/version_in_file/.mvn/maven.config[the
+file]) and that’s all. Now you can update the project version without changing a single thing in
+your pom file.
+
+As always source code for examples can be found on my
+https://github.com/blog-pchudzik-examples/blog-example-maven-revision[GitHub], and a version with
+decoupled maven version is on a
+https://github.com/blog-pchudzik-examples/blog-example-maven-revision/tree/version_in_file[separate
+branch]. You should also checkout https://maven.apache.org/maven-ci-friendly.html[official maven
+announcement for the change].
