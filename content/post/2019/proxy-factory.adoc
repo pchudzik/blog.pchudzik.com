@@ -1,0 +1,142 @@
+---
+title: "ProxyFactory and ProxyFactoryBean in Spring"
+Tags: ["spring", "java"]
+Categories: ["java"]
+description: "Proxy object creation using spring abstractions"
+date: "2019-06-13"
+---
+
+Spring provides many easy to use abstractions and you use many of them without even knowing about
+them. You probably know that in order to have `@Transactional` or `@Cacheable` annotation work
+spring creates proxies for you (sometimes proxies on top of proxies...), but have you ever wondered
+how it’s happening under the hood?
+
+
+[.lead]
+What
+
+Creation of object proxies is a cumbersome task. One has to decide if the proxy should be created
+using native java mechanisms (JdkProxy available only on interfaces) or using cglib and it’s
+complicated interfaces. You might be unaware of what's happening under the hood but sometimes it’s
+good to know how to do it yourself because you might want to create proxy by yourself or maybe you
+are just interested :) There is a couple of ways for proxy object creation.
+
+* Native java proxies with its implementation details (proxy possible on interfaces only not on concrete classes)
+* Cglib proxies with complex creation flow and logic
+* Bytbuddy with much more user-friendly interfaces but not adopted in spring framework
+* Probably many others
+
+Spring is providing many abstractions. As it provides AOP facilities it has abstraction over proxy
+creation. ProxyFactory allows to create proxies in declarative and user-friendly manner. For simple
+proxy creation, we can use ProxyFactory and when you want to create bean from it you can use
+ProxyFactoryBean which is actually BeanFactory which creates proxies using ProxyFactory.
+
+[.lead]
+How
+
+Since ProxyFactoryBean is basically FactoryBean let’s focus on ProxyFactory and how it can be used.
+First of all defining, all the interfaces proxy should implement.
+
+{{<highlight java>}}
+@Test
+public void proxy_implements_interfaces() {
+    ProxyFactory pf = new ProxyFactory();
+    pf.setInterfaces(Interface.class, OtherInterface.class);
+    pf.addAdvice((MethodInterceptor) invocation -> null);
+
+    Object result = pf.getProxy();
+
+    assertThat(result).isInstanceOf(Interface.class);
+    assertThat(result).isInstanceOf(OtherInterface.class);
+}
+{{</highlight>}}
+
+Now let’s add some handlers that will add behavior to the proxy:
+
+{{<highlight java>}}
+@Test
+public void handler_does_work() {
+    ProxyFactory pf = new ProxyFactory();
+    pf.setInterfaces(Interface.class, OtherInterface.class);
+    pf.addAdvice((MethodInterceptor) invocation -> {
+        switch (invocation.getMethod().getName()) {
+            case "doWork":
+                return "processed " + invocation.getArguments()[0];
+            case "process":
+                return (int) invocation.getArguments()[0] + 2;
+            default:
+                return invocation.proceed();
+        }
+    });
+
+    Object result = pf.getProxy();
+
+    assertThat(((Interface)result).doWork(2)).isEqualTo("processed 2");
+    assertThat(((OtherInterface) result).process(2)).isEqualTo(4);
+
+    assertThat(result.hashCode()).isInstanceOf(Integer.class);
+    assertThat(result.equals(null)).isInstanceOf(Boolean.class);
+}
+{{</highlight>}}
+
+Until now all of the things have been implemented using simple Java-based proxies. If you want to
+create proxy out of concrete class implementation spring will automatically switch to cglib and
+http://objenesis.org[objenesis] (interesting project). Let’s create a proxy for some concrete class
+implementation.
+
+{{<highlight java>}}
+@Test
+public void proxy_of_concrete_class_is_created() {
+    ProxyFactory pf = new ProxyFactory();
+    pf.setTargetClass(ConcreteClass.class);
+    pf.addAdvice((MethodInterceptor) invocation -> "concreteWork".equals(invocation.getMethod().getName())
+            ? "magic"
+            : invocation.proceed());
+
+    Object result = pf.getProxy();
+
+    assertThat(result).isInstanceOf(ConcreteClass.class);
+    assertThat(((ConcreteClass) result).concreteWork(123)).isEqualTo("magic");
+}
+{{</highlight>}}
+
+Once the proxy is created we can easily detect if proxy created using spring abstraction is actually
+a proxy (can be used for other objects as well) using AopUtils helper class:
+
+{{<highlight java>}}
+@Test
+public void detects_when_object_is_proxy() {
+    ProxyFactory jdkProxyFactory = new ProxyFactory();
+    jdkProxyFactory.setInterfaces(Interface.class, OtherInterface.class);
+    jdkProxyFactory.addAdvice((MethodInterceptor) invocation -> null);
+
+    ProxyFactory cglibProxyFactory = new ProxyFactory();
+    cglibProxyFactory.setTargetClass(ConcreteClass.class);
+
+
+    Object jdkProxy = jdkProxyFactory.getProxy();
+    Object cglibProxy = cglibProxyFactory.getProxy();
+
+    assertThat(AopUtils.isAopProxy(new Object())).isFalse();
+
+    assertThat(AopUtils.isAopProxy(jdkProxy)).isTrue();
+    assertThat(AopUtils.isCglibProxy(jdkProxy)).isFalse();
+
+    assertThat(AopUtils.isAopProxy(cglibProxy)).isTrue();
+    assertThat(AopUtils.isCglibProxy(cglibProxy)).isTrue();
+}
+{{</highlight>}}
+
+
+[.lead]
+Summary
+
+Proxy creation when you have spring on the classpath is a pretty simple task and can be easily
+achieved. Creating those objects using native mechanism can be a troublesome task and you’ll have to
+write much more code to achieve things that spring abstractions provide in just a couple of methods
+and few interfaces. You might not want to use it very often but when you do you’ll know how to do
+it.
+
+[.small]
+As always sample code can be found on https://github.com/blog-pchudzik-examples/proxy-factory[my
+github].
