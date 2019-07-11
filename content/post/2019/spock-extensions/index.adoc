@@ -1,0 +1,413 @@
+---
+title: "Spock extensions"
+Tags: ["spock", "gradle", "testing"]
+Categories: ["java"]
+description: "How to write your own spock extensions"
+date: "2019-07-11"
+---
+
+Recently I had to set up some extra logic to be executed before running tests. I had two options -
+create yet another abstract class with some behavior or somehow extend Spock and introduce extra
+logic to be executed just before actual test starts. As we already have enough of abstract classes I
+decided to try and do the second option.
+
+<!--more-->
+
+[.lead]
+Intro
+
+My case was complicated one and caused by the decisions made almost a decade ago so I’m not going to
+dig into it too deep. Instead, I’ll implement simple annotation based extension and add basic
+implementation which will allow us to get familiar with how to extend standard spock capabilities.
+
+I'm going to implement simple annotation based extension that will allow to change toggle value for
+test execution time. To achieve it in spring boot you might be tempted to simply create yet another
+application context with toggle mocked. But once you write enough of integration tests and you are
+not working with microservices you’ll start to look for the ways on how to avoid creating extra
+contexts as this is time-consuming.
+
+
+[.lead]
+How
+
+Let’s start with basics and see how we can extend Spock. Very nice addition to one of the last
+releases of Spock was http://spockframework.org/spock/docs/1.3/extensions.html[proper documentation]
+on how to extend the framework with custom behavior and you should start there to know the
+difference between global and annotation based extension and what’s the API you’ll be using.
+
+For annotation based extension we'll need the annotation first:
+
+{{<highlight groovy "linenos=table">}}
+import org.spockframework.runtime.extension.ExtensionAnnotation
+
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
+import java.lang.annotation.Target
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target([ElementType.TYPE, ElementType.FIELD, ElementType.METHOD])
+@ExtensionAnnotation(AnnotationExtension.class)
+@interface SampleAnnotation {
+}
+{{</highlight>}}
+
+According to documentation annotation must be defined as `RUNTIME` (line{nbsp}8) and can be applicable to
+at least one of `TYPE`, `FIELD`, `METHOD` (line{nbsp}9). For spock to recognize what extension actually
+does you must annotate your annotation with `@ExtensionAnnotation` and point spock to the actual
+implementation of the logic (line{nbsp}10). Once we are done with annotation we can proceed with the
+actual extension implementation:
+
+{{<highlight groovy "linenos=table">}}
+import org.spockframework.runtime.extension.IAnnotationDrivenExtension
+import org.spockframework.runtime.extension.IMethodInterceptor
+import org.spockframework.runtime.extension.IMethodInvocation
+import org.spockframework.runtime.model.FeatureInfo
+import org.spockframework.runtime.model.FieldInfo
+import org.spockframework.runtime.model.MethodInfo
+import org.spockframework.runtime.model.SpecInfo
+
+class AnnotationExtension implements IAnnotationDrivenExtension<SampleAnnotation> {
+    @Override
+    void visitSpecAnnotation(SampleAnnotation annotation, SpecInfo spec) {
+        println "visitSpecAnnotation"
+    }
+
+    @Override
+    void visitFeatureAnnotation(SampleAnnotation annotation, FeatureInfo feature) {
+        println "visitFeatureAnnotation"
+
+        feature.addInterceptor(new PrintingMethodInterceptor(msg: "feature interceptor"))
+        feature.addIterationInterceptor(new PrintingMethodInterceptor(msg: "iteration interceptor"))
+    }
+
+    @Override
+    void visitFixtureAnnotation(SampleAnnotation annotation, MethodInfo fixtureMethod) {
+        println "visitFixtureAnnotation"
+
+        fixtureMethod.addInterceptor(new PrintingMethodInterceptor(msg: "fixture interceptor"))
+    }
+
+    @Override
+    void visitFieldAnnotation(SampleAnnotation annotation, FieldInfo field) {
+        println "visitFieldAnnotation"
+    }
+
+    @Override
+    void visitSpec(SpecInfo spec) {
+        println "visitSpec"
+
+        spec.addInitializerInterceptor(new PrintingMethodInterceptor(msg: "initializer interceptor"))
+
+        spec.addSetupInterceptor(new PrintingMethodInterceptor(msg: "setup interceptor"))
+        spec.addCleanupInterceptor(new PrintingMethodInterceptor(msg: "cleanup interceptor"))
+        spec.addSetupSpecInterceptor(new PrintingMethodInterceptor(msg: "setup spec interceptor"))
+        spec.addCleanupSpecInterceptor(new PrintingMethodInterceptor(msg: "cleanup spec interceptor"))
+
+        spec.addInterceptor(new PrintingMethodInterceptor(msg: "test interceptor"))
+    }
+
+    private static class PrintingMethodInterceptor implements IMethodInterceptor {
+        String msg
+
+        @Override
+        void intercept(IMethodInvocation invocation) throws Throwable {
+            println "  Starting ${msg}"
+            try {
+                invocation.proceed()
+            } finally {
+                println "  Finish ${msg}"
+            }
+        }
+    }
+}
+{{</highlight>}}
+
+There's a lot happening in there so let's start from the start. To actually make spock aware that we
+are trying to implement extension in there we must implement
+`org.spockframework.runtime.extension.IAnnotationDrivenExtension` (line{nbsp}9), you can also extend
+`org.spockframework.runtime.extension.AbstractAnnotationDrivenExtension.` Next there is a couple of
+methods that allow us to register interceptors and are called as a visitors when setting up test
+execution context.
+
+[quote, http://spockframework.org/spock/docs/1.3/extensions.html#_annotation_driven_local_extensions]
+____
+
+`visitSpecAnnotation(T annotation, SpecInfo spec)` This is called once for each specification where
+the annotation is applied with the annotation instance as first parameter and the specification info
+object as second parameter (line{nbsp}11).
+
+`visitFeatureAnnotation(T annotation, FeatureInfo feature)` This is called once for each feature
+method where the annotation is applied with the annotation instance as first parameter and the
+feature info object as second parameter (line{nbsp}16).
+
+`visitFixtureAnnotation(T annotation, MethodInfo fixtureMethod)` This is called once for each
+fixture method where the annotation is applied with the annotation instance as first parameter and
+the fixture method info object as second parameter (line{nbsp}24).
+
+`visitFieldAnnotation(T annotation, FieldInfo field)` This is called once for each field where the
+annotation is applied with the annotation instance as first parameter and the field info object as
+second parameter (line{nbsp}31).
+
+`visitSpec(SpecInfo spec)` This is called once for each specification within which the annotation is
+applied to at least one of the supported places like defined above. It gets the specification info
+object as sole parameter. This method is called after all other methods of this interface for each
+applied annotation are processed (line{nbsp}36).
+
+____
+
+Important thing to point out here is that specific methods will not be called if your annotation is
+not applicable on them. For example if you annotation is not applicable on the `FIELD` then
+`visitFieldAnnotation` will not be called.
+
+In couple of places you can registers interceptors which in most cases will be the working horse of
+your extension (lines{nbsp}19,{nbsp}20,{nbsp}27,{nbsp}39-46) and can make things happen around the
+test by registering `org.spockframework.runtime.extension.IMethodInterceptor` which can decided how
+and when call your test method. In the above sample we have simple `PrintingMethodInterceptor`
+(line{nbsp}49) which prints the message (line{nbsp}54) before and after (line{nbsp}58) test
+execution (line{nbsp}56).
+
+To see it in action we can implement simple test and observe what's happening:
+
+{{<highlight groovy>}}
+import com.pchudzik.blog.example.spocklifecycle.extension.SampleAnnotation
+import spock.lang.Specification
+
+@SampleAnnotation
+class TestSpecification extends Specification {
+    @SampleAnnotation
+    def object = new Object()
+
+    def setupSpec() {
+        println "setup spec"
+    }
+    def cleanupSpec() {
+        println "cleanup spec"
+    }
+
+    @SampleAnnotation
+    def setup() {
+        println "setup"
+    }
+
+    def cleanup() {
+        println "cleanup"
+    }
+
+    @SampleAnnotation
+    def "some test 1"() {
+        given:
+        println "given block some test 1"
+
+        when:
+        println "when block some test 1"
+
+        then:
+        println "then block some test 1"
+    }
+
+    @SampleAnnotation
+    def "some test 2"() {
+        given:
+        println "given block some test 2"
+
+        when:
+        println "when block some test 2"
+
+        then:
+        println "then block some test 2"
+    }
+}
+{{</highlight>}}
+
+And the output:
+
+{{<highlight text>}}
+visitSpecAnnotation
+visitFieldAnnotation
+visitFixtureAnnotation
+visitFeatureAnnotation
+visitFeatureAnnotation
+visitSpec  Starting test interceptor
+  Starting setup spec interceptor
+setup spec
+  Finish setup spec interceptor
+  Starting feature interceptor
+  Starting initializer interceptor
+  Finish initializer interceptor
+  Starting iteration interceptor
+  Starting setup interceptor
+  Starting fixture interceptor
+setup
+  Finish fixture interceptor
+  Finish setup interceptor
+given block some test 1
+when block some test 1
+then block some test 1
+  Starting cleanup interceptor
+cleanup
+  Finish cleanup interceptor
+  Finish iteration interceptor
+  Finish feature interceptor
+  Starting feature interceptor
+  Starting initializer interceptor
+  Finish initializer interceptor
+  Starting iteration interceptor
+  Starting setup interceptor
+  Starting fixture interceptor
+setup
+  Finish fixture interceptor
+  Finish setup interceptor
+given block some test 2
+when block some test 2
+then block some test 2
+  Starting cleanup interceptor
+cleanup
+  Finish cleanup interceptor
+  Finish iteration interceptor
+  Finish feature interceptor
+  Starting cleanup spec interceptor
+cleanup spec
+  Finish cleanup spec interceptor
+  Finish test interceptor
+{{</highlight>}}
+
+Which is neatly represented in spock documentation by the schema:
+
+[.center-image]
+image::spock_interceptors.png[How to export code style from idea]
+
+[.lead]
+Toggle sample
+
+Once we’ve covered basic usage we can start working on something more useful. Imagine simple
+application which executes some logic based on toggle value. For simplicity and to easily present
+the core of this post I'll implement toggle service as an plain old singleton java object.
+
+[.small]
+It might not be enough for production like usage but should do for demo purposes in which I’m trying
+to show how to use annotation based extensions in Spock. For production usages you should consider
+using (https://github.com/ff4j/ff4j[ff4] or https://unleash.github.io[unleash] or
+https://www.togglz.org[togglz]). If you want to approach this in a similar way you should rather go
+with dependency injection and if using spring maybe do it with TestExecutionListener and custom
+annotation https://blog.pchudzik.com/201903/spring-factories/[samples].
+
+{{<highlight java>}}
+public class TheService {
+    private final Toggler toggler;
+
+    public TheService(Toggler toggler) {
+        this.toggler = toggler;
+    }
+
+    public List<Integer> doProcess(List<Integer> integers) {
+        return integers.stream()
+                .map(i -> i + 1)
+                .map(this::doExtraProcessing)
+                .collect(Collectors.toList());
+    }
+
+    private int doExtraProcessing(Integer i) {
+        final int extraValue = toggler.isExtraProcessingEnabled() ? -1 : 1;
+        return i * extraValue;
+    }
+}
+{{</highlight>}}
+
+{{<highlight java>}}
+public final class Toggler {
+    public static final String EXTRA_PROCESSING = "extraProcessingEnabled";
+    private static final Toggler INSTANCE = new Toggler();
+    private final Map<String, Boolean> toggles = Stream
+            .of(
+                    new SimpleEntry<>(EXTRA_PROCESSING, false))
+            .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    private Toggler() {
+    }
+
+    public static Toggler getInstance() {
+        return INSTANCE;
+    }
+
+    public boolean isExtraProcessingEnabled() {
+        return toggles.getOrDefault(EXTRA_PROCESSING, false);
+    }
+
+    public boolean getValue(String key) {
+        return toggles.get(key);
+    }
+
+    public void setValue(String key, boolean value) {
+        toggles.put(key, value);
+    }
+}
+{{</highlight>}}
+
+From this we can jump right into the implementation of the test with our to be approach and work
+from there to implement the extension based we’ve created on the go:
+
+{{<highlight groovy>}}
+class TheServiceTest extends Specification {
+    private def service = new TheService(Toggler.instance)
+
+    @ToggleValue(toggle = Toggler.EXTRA_PROCESSING, value = false)
+    def "toggle disabled"() {
+        when:
+        final result = service.doProcess([1, 2])
+
+        then:
+        result == [2, 3]
+    }
+
+    @ToggleValue(toggle = Toggler.EXTRA_PROCESSING, value = true)
+    def "toggle enabled"() {
+        when:
+        final result = service.doProcess([1, 2])
+
+        then:
+        result == [-2, -3]
+    }
+}
+{{</highlight>}}
+
+Obviously, it’ll not compile and fail as there is no annotation yet and the toggle stays the same
+for both test executions. Our first step will make it compile:
+
+{{<highlight groovy>}}
+@Retention(RetentionPolicy.RUNTIME)
+@Target([ElementType.TYPE, ElementType.FIELD, ElementType.METHOD])
+@ExtensionAnnotation(AnnotationExtension.class)
+@interface ToggleValue {
+    String toggle();
+
+    boolean value();
+}
+{{</highlight>}}
+
+{{<highlight groovy>}}
+class ToggleValueExtension extends AbstractAnnotationDrivenExtension<ToggleValue> {
+    @Override
+    void visitFeatureAnnotation(ToggleValue annotation, FeatureInfo feature) {
+        print("toggle ${annotation.toggle()} set to ${annotation.value()}")
+        feature.addInterceptor({invocation ->
+            final originalValue = Toggler.instance.getValue(annotation.toggle())
+            Toggler.instance.setValue(annotation.toggle(), annotation.value())
+            invocation.proceed()
+            Toggler.instance.setValue(annotation.toggle(), originalValue)
+        })
+    }
+}
+{{</highlight>}}
+
+As you see extending Spock behavior is not so complicated process and can provide extra
+functionalities to your tests and decouple it from your business logic.
+
+If you are interested in implementing more advanced and rea life extensions you should take a look into:
+
+* http://spockframework.org/spock/docs/1.3/extensions.html[Spock documentation on this topic]
+* https://github.com/spockframework/spock/tree/master/spock-core/src/main/java/org/spockframework/runtime/extension/builtin[Extensions
+  already embedded into framework]
+* https://github.com/spockframework/spock/wiki/Third-Party-Extensions[Thirdy party extensions]
+* As always samples for this blog post can be found on
+  https://github.com/blog-pchudzik-examples/spock-lifecycle[my github]
