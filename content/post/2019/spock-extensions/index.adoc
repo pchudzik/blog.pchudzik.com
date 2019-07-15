@@ -377,7 +377,7 @@ for both test executions. Our first step will make it compile:
 {{<highlight groovy>}}
 @Retention(RetentionPolicy.RUNTIME)
 @Target([ElementType.TYPE, ElementType.FIELD, ElementType.METHOD])
-@ExtensionAnnotation(AnnotationExtension.class)
+@ExtensionAnnotation(ToggleValueExtension.class)
 @interface ToggleValue {
     String toggle();
 
