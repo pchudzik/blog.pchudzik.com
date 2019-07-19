@@ -1,0 +1,163 @@
+---
+title: "Testcontainers"
+Tags: ["java", "testing", "spock", "docker"]
+Categories: ["java"]
+description: "Quick introduction to testcontainers library"
+date: "2019-07-18"
+---
+
+Recently I’ve found a very interesting project which allows to spin up docker containers for test
+purposes. Writing tests checking integration with external services is not an easy task. With
+https://www.testcontainers.org[testcontainers] library it gets simpler because you can have external
+service up and running just for your test in a couple of lines of code.
+
+<!--more-->
+
+[.lead]
+Why
+
+Couple times in the past I’ve faced the problem which can be summarized in the following statement:
+
+[quote]
+____
+Should I write my integration tests against stubbed/mocked service or maybe I should verify it
+against a live application.
+____
+
+Sometimes the integration is a critical part from an application perspective and you’d just sleep
+better if you know that it’s working just fine with live service not only with mocks. In the past
+writing tests like this required a lot of infrastructure configuration to have service prepared for
+testing. But with docker and testcontainers project things are much simpler now. Docker simplifies a
+lot of things in the development process but when you can spin up the container with required
+service directly from tests exactly when it’s needed that’s a huge simplification of the development
+process.
+
+[.lead]
+Example
+
+I’m not going to do a lot of explaining here as the project have some solid and easy to understand
+and follow documentation. Instead, let’s write some tests and see if it works ;)
+
+I’ll do something really simple so it’s easy to understand and will show the potential of this tool.
+Assume we have to verify some communication with Redis.
+
+First of all, let’s declare a couple of dependencies that will be required in this demo:
+
+{{<highlight gradle>}}
+dependencies {
+	implementation "redis.clients:jedis:3.0.1"
+	implementation "ch.qos.logback:logback-classic:1.2.3"
+	testImplementation "org.codehaus.groovy:groovy-all:2.5.7"
+	testImplementation "org.spockframework:spock-core:1.3-groovy-2.5"
+	testImplementation "org.testcontainers:spock:1.11.4"
+}
+{{</highlight>}}
+
+{{<highlight java "linenos=table">}}
+import redis.clients.jedis.Jedis;
+
+import java.util.Optional;
+
+public class KeyValueStorage {
+    private final Jedis jedis;
+
+    public KeyValueStorage(String host, int port) {
+        jedis = new Jedis(host, port);
+    }
+
+    public void set(String key, String value) {
+        jedis.set(key, value);
+    }
+
+    public Optional<String> get(String key) {
+        return Optional.ofNullable(jedis.get(key));
+    }
+}
+{{</highlight>}}
+
+Now we have our class to check if the integration works fine and we can easily write tests to verify
+it’s behavior:
+
+{{<highlight groovy "linenos=table">}}
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.output.Slf4jLogConsumer
+import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.spock.Testcontainers
+import spock.lang.Specification
+import spock.lang.Subject
+
+@Testcontainers
+class TestContainersTest extends Specification {
+    private static final Logger log = LoggerFactory.getLogger(TestContainersTest)
+
+    private GenericContainer redis = new GenericContainer<>("redis:5.0.3-alpine")
+            .withLogConsumer(new Slf4jLogConsumer(log))
+            .withExposedPorts(6379)
+            .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1))
+
+    @Subject
+    private KeyValueStorage keyValueStorage
+
+    void setup() {
+        keyValueStorage = new KeyValueStorage(
+                redis.containerIpAddress,
+                redis.firstMappedPort)
+    }
+
+    def "puts value to storage"() {
+        when:
+        keyValueStorage.set("asd", "zxc")
+
+        then:
+        keyValueStorage.get("asd") == Optional.of("zxc")
+    }
+
+    def "gets value from storage"() {
+        when:
+        keyValueStorage.set("asd", "zxc")
+
+        then:
+        keyValueStorage.get("asd") == Optional.of("zxc")
+        keyValueStorage.get("missing key") == Optional.empty()
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/testcontainers[Complete sample project]
+
+
+Once you start reading the code you’ll notice annotation org.testcontainers.spock.Testcontainers
+(line&nbsp;10) (https://blog.pchudzik.com/201907/spock-extensions/[spock extension]) and is
+responsible for container lifecycle management.
+
+Next, we declare and initialize container itself using GenericContainer (line&nbsp;14). Note that
+there is a couple of ready to use containers
+https://www.testcontainers.org/modules/databases/[provided by authors of the library]).
+
+We can easily get exposed port and IP address of the service running in the container in the setup
+block (lines &nbsp;24 and 25). And with that, we can write tests against live Redis instance (lines&nbsp; 28 and 36) without doing and docker stuff by hand :)
+
+[.lead]
+Documentation
+
+As I’ve mentioned earlier the documentation is pretty good and here are a couple of pages that I
+think will be useful as a reference to the things you might want to do or check before deciding to
+use it:
+
+* https://www.testcontainers.org/quickstart/junit_4_quickstart/
+* https://www.testcontainers.org/quickstart/spock_quickstart/
+* https://www.testcontainers.org/features/networking/
+* https://www.testcontainers.org/features/startup_and_waits/
+* https://www.testcontainers.org/features/creating_images/
+
+
+[.lead]
+Summary
+
+I’m really glad I’ve stumbled upon this project as I’ve already identified a couple of places where
+I could have used it instead of writing some bizarre mocks or stubs to provide basic functionality
+that is required to run some process. Next time I’ll be facing similar dilemma I’ll consider this
+library and most likely try it and see it in the wild :)
