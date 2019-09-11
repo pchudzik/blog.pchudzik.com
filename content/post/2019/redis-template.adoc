@@ -1,0 +1,206 @@
+---
+title: "Hands-on RedisTemplate"
+Tags: ["java", "testing", "docker"]
+Categories: ["java"]
+date: "2019-09-11"
+---
+
+We are improving cache in the project Im working on. In the code base I've found a method which
+accepted a collection of ids and returned collection of objects for those ids. My goal was to add
+cache on individual values returned by the method. Creation of items was IO heavy and time-consuming
+operation so removal of cache was not an option.
+
+<!--more-->
+
+I'm working with old system and logic for loading and invalidating values was complicated and
+scattered across many places. To change this serious refactoring would be needed so I've decided to
+leave it be, but to improve codebase a bit and fix cache layer (code of various business operations
+was mixed with native Ehcache API calls).
+
+I wanted to cache items separately because it was up to the user to decide what elements he wants to
+access and “up to him to decide” what elements should be invalidated. The main challenge was in the
+way the cache was used. If you image your method as something like (called from different places and
+invalidated in other on single item basis):
+
+{{<highlight java>}}
+List<Item> findItems(Collection<UUID> ids)
+{{</highlight>}}
+
+It’s been called from different places like (and always invalidated for single element):
+
+{{<highlight java>}}
+findItems(asList(1,2,3));
+findItems(asList(1));
+findItems(asList(2,3))
+{{</highlight>}}
+
+My first concept was to implement this caching mechanism using
+https://docs.spring.io/spring/docs/4.3.15.RELEASE/spring-framework-reference/html/cache.html[spring’s
+cache abstraction], but it is based on a pretty simple idea and it does not allow such behavior,
+even with a
+https://docs.spring.io/spring/docs/4.3.15.RELEASE/spring-framework-reference/html/cache.html#cache-annotations-cacheable-key[custom
+key generator], all you can do is to convert input arguments to something different, not to mention
+invalidate single value from cached collection... Spring cache abstraction doesn’t solve the problem
+for me :( Because of that I had to improvise a bit and solve the issue by myself.
+
+As we are using Redis for caching I’ve decided that this is vendor lock I’m willing to live with,
+but firstly I’ve created abstraction so there will be only one place to change in case we’ll need to
+pick different cache vendor and we will not have to worry about implementation details and how to
+use the cache in the future except this one class responsible for it.
+
+{{<highlight java>}}
+interface ItemsCache {
+    List<Item> findItems(Collection<UUID> ids);
+
+    void saveItems(Collection<Item> items);
+}
+{{</highlight>}}
+
+[.small]
+In reality there was more but let's keep it simple.
+
+Next, all I had to do was implement a basic caching mechanism using  spring’s
+https://docs.spring.io/spring-data/redis/docs/current/api/org/springframework/data/redis/core/RedisTemplate.html[RedisTemplate].
+I’ve started from writing tests to avoid rebooting application or cleaning up Redis every time I’ve
+messed something up (serialization of those objects to JSON was not so easy as those were pretty
+complex and big structures...):
+
+{{<highlight java>}}
+@Test
+public void items_are_loaded_from_cache() {
+    //given
+    final Item item1 = anyItem();
+    final Item item2 = anyItem();
+    Mockito
+            .when(slowItemRepository.get(item1.getId()))
+            .thenReturn(item1);
+    Mockito
+            .when(slowItemRepository.get(item2.getId()))
+            .thenReturn(item2);
+
+    //when
+    itemsService.findItems(singleton(item1.getId()));
+    itemsService.findItems(singleton(item2.getId()));
+    itemsService.findItems(asList(item1.getId(), item2.getId()));
+
+    //then
+    Mockito.verify(slowItemRepository, times(1)).get(item1.getId());
+    Mockito.verify(slowItemRepository, times(1)).get(item2.getId());
+}
+
+@Test
+public void ttl_is_set_on_items() {
+    //given
+    final Item item = anyItem();
+    Mockito
+            .when(slowItemRepository.get(item.getId()))
+            .thenReturn(item);
+
+    //when
+    itemsService.findItems(singleton(item.getId()));
+
+    //then
+    long ttl = jedisConnectionFactory.getConnection().pTtl(("Item:" + item.getId()).getBytes());
+    Assert.assertTrue(ttl > 0);
+}
+{{</highlight>}}
+
+The last step was to write actual implementation of the service:
+
+{{<highlight java>}}
+@Service
+@RequiredArgsConstructor
+public class ItemsService {
+    private final SlowItemRepository repository;
+    private final ItemsCache itemsCache;
+
+    public List<Item> findItems(Collection<UUID> ids) {
+        final List<Item> foundInCache = itemsCache.findItems(ids);
+        final List<Item> notCached = loadMissingItems(ids, foundInCache);
+
+        final List<Item> result = Stream
+                .concat(foundInCache.stream(), notCached.stream())
+                .collect(toList());
+
+        itemsCache.saveItems(notCached);
+
+        return result;
+    }
+
+    private List<Item> loadMissingItems(Collection<UUID> ids, List<Item> foundInCache) {
+        final Set<UUID> cachedIds = foundInCache.stream()
+                .map(Item::getId)
+                .collect(Collectors.toSet());
+        return ids.stream()
+                .filter(id -> !cachedIds.contains(id))
+                .map(this::lookupInRepository)
+                .collect(toList());
+    }
+
+    private Item lookupInRepository(UUID id) {
+        return repository.get(id);
+    }
+}
+{{</highlight>}}
+
+And caching itself:
+
+{{<highlight java>}}
+@Component
+@RequiredArgsConstructor
+public class ItemsCacheImpl implements ItemsCache {
+    private final RedisTemplate<String, Item> redisTemplate;
+
+    @Override
+    public List<Item> findItems(Collection<UUID> ids) {
+        final List<Item> result = redisTemplate.opsForValue()
+                .multiGet(ids.stream().map(this::generateCacheKey).collect(toList()))
+                .stream()
+                .filter(Objects::nonNull)
+                .collect(toList());
+
+        refreshTTL(result);
+
+        return result;
+    }
+
+    @Override
+    public void saveItems(Collection<Item> items) {
+        redisTemplate.opsForValue()
+                .multiSet(items.stream()
+                        .collect(Collectors.toMap(
+                                item -> generateCacheKey(item.getId()),
+                                Function.identity())));
+        refreshTTL(items);
+    }
+
+    private void refreshTTL(Collection<Item> result) {
+        redisTemplate.executePipelined((SessionCallback) callback -> {
+            result.stream()
+                    .map(item -> generateCacheKey(item.getId()))
+                    .forEach(key -> callback.expire(key, 10, TimeUnit.MINUTES));
+            return null;
+        });
+    }
+
+    private String generateCacheKey(UUID id) {
+        return "Item:" + id;
+    }
+}
+{{</highlight>}}
+
+As Redis provides commands to https://redis.io/commands/mget[get] and
+https://redis.io/commands/mset[set] operations that allow to look for or store multiple objects at
+once implementation turned out not to be so complicated.
+
+When I started working on it, at first I was afraid that I’ll have to write a lot of low-level code
+to make it work but luckily with spring’s
+https://docs.spring.io/spring-data/redis/docs/current/api/org/springframework/data/redis/core/RedisTemplate.html[RedisTemplate]
+it turned out not to be so ugly nor complicated after all. A bit of legacy code allowed mu to get to
+know what spring has to offer in terms of integration with redis, which turned out to be pretty easy
+to work with ;)
+
+[.small]
+As always sources can be found https://github.com/blog-pchudzik-examples/redistemplate[on my
+github].
+
