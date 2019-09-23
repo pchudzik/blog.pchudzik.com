@@ -1,0 +1,288 @@
+---
+title: "Answers in mockito"
+Tags: ["java", "testing", mockito]
+Categories: ["java"]
+date: "2019-09-22"
+---
+
+Mocking library is an important tool in every developer toolbox. Sometimes you want to do things
+that at first glance look a bit more complex than returning number 42 from some method. Let’s see
+what stubbing techniques are available in Mockito out of the box and what they offer.
+
+<!--more-->
+
+[.lead]
+Word of warning
+
+When you have to use some of the answers from below it either means that you are working with some
+legacy system and need to make things testable so you can proceed with refactoring. Or it means that
+you’ve just produced some shitty design and should think it over. I only hope that what you are
+facing is legacy system.
+
+[.lead]
+RETURNS_DEFAULTS
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#RETURNS_DEFAULTS
+
+We should start with default Mockito behavior which is `RETURNS_DEFAULTS` You are probably already
+familiar with it because that’s how Mockito works out of the box.
+
+{{<highlight java>}}
+@Test
+public void returns_defaults() {
+	//given
+	class SomeObject {
+		public int getInt() {
+			return 100;
+		}
+
+		public boolean getBoolean() {
+			return true;
+		}
+
+		public String getString() {
+			return "abc";
+		}
+
+		public List<String> getList() {
+			return null;
+		}
+	}
+	final SomeObject object = Mockito.mock(SomeObject.class);
+
+	assertThat(object.getInt(), is(0));
+	assertThat(object.getBoolean(), is(false));
+	assertThat(object.getString(), nullValue());
+	assertThat(object.getList().size(), is(0));
+}
+{{</highlight>}}
+
+What you might’ve missed is what values will be returned for primitives (and their boxed values). It looks following:
+{{<highlight text>}}
+Boolean                                   -> false
+Character                                 -> \u0000
+Byte, Short, Integer, Long, Float, Double -> 0
+{{</highlight>}}
+
+[.small]
+https://github.com/mockito/mockito/blob/v3.0.8/src/main/java/org/mockito/internal/util/Primitives.java#L75[source]
+
+There is one more default behavior that’s is often overlooked. This strategy will try and return
+empty collection for of appropriate type if you’ll ask for it. It’ll return empty List or Set or
+even a Map and Optional in java8 -
+https://github.com/mockito/mockito/blob/v3.0.8/src/main/java/org/mockito/internal/stubbing/defaultanswers/ReturnsEmptyValues.java[source].
+
+[.lead]
+CALLS_REAL_METHODS
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#CALLS_REAL_METHODS
+
+Strategy used by default when you create a spy of an object (or partial mock). It tries to create an
+instance of the object and forward all calls to real methods in this object recording all
+interactions and allows to partially stub object behavior.
+
+{{<highlight java>}}
+@Test
+public void calls_real_methods() {
+	//given
+	class Dragon {
+		public String burn() {
+			return "fire";
+		}
+
+		public int heat() {
+			return Integer.MAX_VALUE;
+		}
+	}
+	final Dragon dragonSpy = Mockito.mock(Dragon.class, Mockito.CALLS_REAL_METHODS);
+
+	//expect
+	assertThat(dragonSpy.burn(), equalTo("fire"));
+	assertThat(dragonSpy.heat(), equalTo(Integer.MAX_VALUE));
+
+	//when
+	Mockito.when(dragonSpy.burn()).thenReturn("ice");
+	Mockito.when(dragonSpy.heat()).thenReturn(Integer.MIN_VALUE);
+
+	//then
+	assertThat(dragonSpy.burn(), is("ice"));
+	assertThat(dragonSpy.heat(), is(Integer.MIN_VALUE));
+}
+{{</highlight>}}
+
+[.lead]
+RETURNS_SMALL_NULLS
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#RETURNS_SMART_NULLS
+
+The answer that will throw nice NullPointer like exception that will allow you to find places in
+code that are using mocks and fix them. I honestly have never used it but maybe in some exotic
+cases, it might be useful.
+
+{{<highlight java>}}
+@Test
+public void returns_smart_nulls() {
+	//given
+	class SomeObject {
+		BigDecimal someValue() {
+			return BigDecimal.ZERO;
+		}
+	}
+	final SomeObject object = Mockito.mock(SomeObject.class, Mockito.RETURNS_SMART_NULLS);
+
+	//when
+	catchException(object.someValue()).abs();
+
+	//then
+	assertThat(caughtException(), isA(SmartNullPointerException.class));
+}
+{{</highlight>}}
+
+In case of NPE exception you’ll get following stack trace message:
+
+{{<highlight text>}}
+You have a NullPointerException here:
+-> at com.pchudzik.blog.example.stubbing.MockitoStubbing.returns_smart_nulls(MockitoStubbing.java:83)
+because this method call was *not* stubbed correctly:
+-> at com.pchudzik.blog.example.stubbing.MockitoStubbing.returns_smart_nulls(MockitoStubbing.java:83)
+someObject.someValue();
+
+org.mockito.exceptions.verification.SmartNullPointerException:
+You have a NullPointerException here:
+-> at com.pchudzik.blog.example.stubbing.MockitoStubbing.returns_smart_nulls(MockitoStubbing.java:83)
+because this method call was *not* stubbed correctly:
+-> at com.pchudzik.blog.example.stubbing.MockitoStubbing.returns_smart_nulls(MockitoStubbing.java:83)
+someObject.someValue();
+
+	at com.pchudzik.blog.example.stubbing.MockitoStubbing.returns_smart_nulls(MockitoStubbing.java:83)
+	at ...
+{{</highlight>}}
+
+[.lead]
+RETURNS_SELF
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#RETURNS_SELF
+
+If you need to stub builder object here’s the strategy that will work out of the box providing very
+convenient behavior to be used with builders.
+
+{{<highlight java>}}
+@Test
+public void returns_self() {
+	//given
+	class Builder {
+		Builder setA() {
+			return this;
+		}
+
+		Builder setB() {
+			return this;
+		}
+
+		Builder setC() {
+			return this;
+		}
+
+		String build() {
+			return "done";
+		}
+	}
+	final Builder builder = Mockito.mock(Builder.class, Mockito.RETURNS_SELF);
+	Mockito.when(builder.build()).thenReturn("mock");
+
+	//when
+	final String result = builder
+			.setA()
+			.setB()
+			.setC()
+			.build();
+
+	//then
+	assertThat(result, is("mock"));
+}
+{{</highlight>}}
+
+[.lead]
+RETURNS_MOCKS
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#RETURNS_MOCKS
+
+An interesting answer that for every call will create a new mock instance. Might be useful if you
+have long invocation chains in your code but you don’t care about them and all you need is a passing
+test.
+
+{{<highlight java>}}
+@Test
+public void returns_mocks() {
+	class Child { }
+	class Parent {
+		Child getChild() {
+			return null;
+		}
+	}
+	final Parent parent = Mockito.mock(Parent.class, Mockito.RETURNS_MOCKS);
+
+	//when
+	Child child1 = parent.getChild();
+	Child child2 = parent.getChild();
+	Child child3 = parent.getChild();
+
+	//then
+	assertThat(child1, not(is(child2)));
+	assertThat(child1, not(is(child3)));
+	assertThat(child2, not(is(child3)));
+}
+{{</highlight>}}
+
+[.lead]
+RETURNS_DEEP_STUBS
+
+https://static.javadoc.io/org.mockito/mockito-core/3.0.0/org/mockito/Mockito.html#RETURNS_DEEP_STUBS
+
+Most interesting/dangerous one. If you need to use it, it probably means that you are doing
+something very wrong and it’s time to step back and think it over… It’s very similar to
+`RETURNS_MOCKS` but instead of returning new object every time you call it keeps the reference to it
+allowing you to create deep stub chains or verifications.
+
+{{<highlight java>}}
+@Test
+public void returns_deep_stubs() {
+	//given
+	class Spell {
+		String doMagic() {
+			return "poof";
+		}
+	}
+
+	class Wand {
+		private Spell spell;
+		Spell getSpell() {
+			return spell;
+		}
+	}
+
+	class Fairy {
+		private Wand wand;
+		Wand getWand() {
+			return wand;
+		}
+	}
+
+	final Fairy deadFairy = Mockito.mock(Fairy.class, Mockito.RETURNS_DEEP_STUBS);
+
+	//when
+	Mockito.when(deadFairy.getWand().getSpell().doMagic()).thenReturn("Fairy is dead");
+
+	//then
+	assertThat(deadFairy.getWand().getSpell().doMagic(), is("Fairy is dead"));
+}
+{{</highlight>}}
+
+
+I’ve been using Mockito for a couple of years now and I’ve only used `RETURNS_SELF` and seen other
+people using `RETURNS_DEEP_STUBS` but I think it’s good to know that other options can be used and
+what’s the default behavior of the widely used framework.
+
+[.small]
+Souce code for examples can be found on https://github.com/blog-pchudzik-examples/mockito-answers[my
+githib].

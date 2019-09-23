@@ -196,7 +196,7 @@ once implementation turned out not to be so complicated.
 When I started working on it, at first I was afraid that I’ll have to write a lot of low-level code
 to make it work but luckily with spring’s
 https://docs.spring.io/spring-data/redis/docs/current/api/org/springframework/data/redis/core/RedisTemplate.html[RedisTemplate]
-it turned out not to be so ugly nor complicated after all. A bit of legacy code allowed mu to get to
+it turned out not to be so ugly nor complicated after all. A bit of legacy code allowed me to get to
 know what spring has to offer in terms of integration with redis, which turned out to be pretty easy
 to work with ;)
 
