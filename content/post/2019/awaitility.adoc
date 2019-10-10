@@ -1,0 +1,99 @@
+---
+title: "Awaitility"
+Tags: ["java", "testing"]
+Categories: ["java"]
+date: "2019-10-10"
+---
+
+If you are not working with multithreading programming and don’t have to test any asynchronous code
+then this post will probably do you nothing good. But if you have ever struggled with testing some
+logic running in multiple threads and you don’t know
+https://github.com/awaitility/awaitility[Awaitility]. A small library helps testing asynchronous
+code. If you've never heard of it then you should continue reading.
+
+<!--more-->
+
+If the framework you are using is hiding all the multithreading complexity from you, and you never
+have to work with threads or ExecutorService then you’ll probably will find no usage for
+https://github.com/awaitility/awaitility[Awaitility]. Awaitility is a small library designed to help
+you out with testing asynchronous code. It does only this one thing and does it well.
+
+On Awaitility's GitHub you can read:
+
+[quote, https://github.com/awaitility/awaitility]
+____
+Testing asynchronous systems is hard. Not only does it require handling threads, timeouts and
+concurrency issues, but the intent of the test code can be obscured by all these details. Awaitility
+is a DSL that allows you to express expectations of an asynchronous system in a concise and easy to
+read manner.
+____
+
+If you’ve ever tried to write tests for asynchronous code you know exactly what they mean on their website.
+
+With Awaitility one can easily implement tests for asynchronous code. In order to keep it simple
+let's write tests for a producer-consumer problem with simple queue in the middle. We have one
+thread producing something pushing data on the queue and other thread consuming those messages as
+they come. Now if we want to write tests for this kind of program we’ll have to write our own DSL to
+do it or we’d have to introduce a lot of complexity into test logic to wait for test scenario to
+finish. With Awaitility it’s much easier:
+
+{{<highlight groovy>}}
+def "consumes all messages if producer is fast"() {
+    given:
+    final numberOfMessages = 10
+    final fastProducer = 10
+    final slowConsumer = 100
+
+    and:
+    final coordinator = new Coordinator(messageRepository, numberOfMessages, smallQueue, fastProducer, slowConsumer)
+
+    when:
+    final consumer = coordinator.startConsumer()
+    final producer = coordinator.startProducer()
+
+    then:
+    await()
+            .atMost(2, TimeUnit.SECONDS)
+            .until(
+                    { messageRepository.count() },
+                    equalTo(numberOfMessages))
+
+    cleanup:
+    [consumer, producer, coordinator].each { it.close() }
+}
+
+def "consumes all messages if producer is slow"() {
+    given:
+    final numberOfMessages = 10
+    final slowProducer = 100
+    final fastConsumer = 10
+
+    and:
+    final coordinator = new Coordinator(messageRepository, numberOfMessages, smallQueue, slowProducer, fastConsumer)
+
+    when:
+    final consumer = coordinator.startConsumer()
+    final producer = coordinator.startProducer()
+
+    then:
+    await()
+            .atMost(2, TimeUnit.SECONDS)
+            .until(
+                    { messageRepository.count() },
+                    equalTo(numberOfMessages))
+
+    cleanup:
+    [consumer, producer, coordinator].each { it.close() }
+}
+{{</highlight>}}
+
+Besides this naive example like above, you can take a look into
+https://github.com/awaitility/awaitility/wiki/Usage#usage-examples[other examples] available in the
+official wiki page of the project.
+
+As you see testing asynchronous code with Awaitility is much easier and doesn’t clog your test logic
+with low-level checks required to verify system behaviour or even worse `Thread.sleep` calls just to
+wait a bit until everything is finished. Next time when you’ll have to write tests that have to test
+some async logic remember about this small and useful utility :)
+
+As always full source code can be found on https://github.com/blog-pchudzik-examples/awaitility[my github].
