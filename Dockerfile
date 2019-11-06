@@ -23,7 +23,7 @@ RUN echo '#!/bin/sh \n\
 
 RUN echo '#!/bin/sh \n\
 /bin/cleanup \n\
-/bin/hugo -d /dist\n' > /bin/build
+/bin/hugo --minify -d /dist\n' > /bin/build
 
 RUN echo '#!/bin/sh \n\
 /bin/cleanup \n\
