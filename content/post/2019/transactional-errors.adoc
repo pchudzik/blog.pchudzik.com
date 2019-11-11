@@ -1,0 +1,285 @@
+---
+title: "Error handling with @Transactional"
+Tags: ["java", "spring"]
+Categories: ["java"]
+date: "2019-11-11"
+---
+
+You probably already know that by default in spring transactions are rolled back only for runtime exceptions.
+When a checked exception is thrown from your code and you don’t explicitly tell spring that it should rollback the transaction then it get's committed.
+In this post, I’m going to create simple reference material on when transactions are rollback when using Spring and Lombok.
+
+<!--more-->
+
+We had this bug where we’ve been importing big excel file and part of it was saved although somewhere, in the end, there was checked exception thrown.
+The method was marked as `@Transactional` but there was no explicit rollback on checked exception.
+Luckily it wasn’t such a big deal as in this case data consistency was not so important and easy to fix.
+After that bug and investigating a bit of our code I’ve decided to check how exactly it works and when things will be rolled back.
+When we throw Lombok (`@SneakyThrows`) into the mix things are getting really spicy and there are some good and some bad news ;)
+
+Starting with basics I’m going to play with behavior that is documented (<<lombok,Lombok part is at the end>>).
+
+[.lead]
+Rollback on runtime exception
+
+{{<highlight java>}}
+@Transactional
+public void rollbacksOnRuntimeException() {
+    jdbcTemplate.execute("insert into test_table values('rollbacksOnRuntimeException')");
+    throw new RuntimeException("Rollback!");
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: ExceptionThrowing.rollbacksOnRuntimeException
+After:   ExceptionThrowing.rollbacksOnRuntimeException: []
+{{</highlight>}}
+
+Nothing to add here.
+It’s how it’s supposed to work. When you throw RuntimeException your transaction will be rolled back.
+
+[.lead]
+No rollback for a checked exception (!)
+
+{{<highlight java>}}
+@Transactional
+public void noRollbackOnCheckedException() throws Exception {
+    jdbcTemplate.execute("insert into test_table values('noRollbackOnCheckedException')");
+    throw new Exception("Simple exception");
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: ExceptionThrowing.noRollbackOnCheckedException
+After:   ExceptionThrowing.noRollbackOnCheckedException: [TestData{value='noRollbackOnCheckedException'}]
+{{</highlight>}}
+
+If you don't read documentation you might be surprised here.
+
+[quote, Rolling Back a Declarative Transaction, https://docs.spring.io/spring/docs/5.2.x/spring-framework-reference/data-access.html#transaction-declarative-rolling-back]
+____
+In its default configuration, the Spring Framework’s transaction infrastructure code marks a transaction for rollback only in the case of runtime, unchecked exceptions.
+That is, when the thrown exception is an instance or subclass of RuntimeException.
+(Error instances also, by default, result in a rollback).
+Checked exceptions that are thrown from a transactional method do not result in rollback in the default configuration.
+____
+
+[.lead]
+Rollback on checked exception
+
+{{<highlight java>}}
+@Transactional(rollbackOn = CustomCheckedException.class)
+    public void withRollbackOnAndDeclaredException() throws CustomCheckedException {
+    jdbcTemplate.execute("insert into test_table values('withRollbackForAndDeclaredException')");
+    throw new CustomCheckedException("rollback me");
+}
+
+@Transactional(rollbackOn = CustomCheckedException.class)
+public void withRollbackOnAndRuntimeException() throws CustomCheckedException {
+    jdbcTemplate.execute("insert into test_table values('withRollbackOnAndRuntimeException')");
+    throw new RuntimeException("rollback me");
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: ExceptionThrowing.withRollbackOnAndDeclaredException
+After:   ExceptionThrowing.withRollbackOnAndDeclaredException []
+
+Running: ExceptionThrowing.withRollbackOnAndRuntimeException
+After:   ExceptionThrowing.withRollbackOnAndRuntimeException []
+{{</highlight>}}
+
+If you tell spring it'll rollback transaction on checked exception.
+It'll also roll it back in case runtime exception is thrown.
+
+[.lead]
+Rollback on RuntimeException
+
+{{<highlight java>}}
+@Transactional(rollbackOn = RuntimeException.class)
+public void doRollbackOnRuntimeException() {
+    jdbcTemplate.execute("insert into test_table values('doRollbackOnRuntimeException')");
+    throw new IllegalStateException("Exception");
+}
+
+@Transactional(dontRollbackOn = RuntimeException.class)
+public void noRollbackOnRuntimeException() {
+    jdbcTemplate.execute("insert into test_table values('noRollbackOnRuntimeException')");
+    throw new IllegalStateException("Exception");
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: ExceptionThrowing.doRollbackOnRuntimeException
+After:   ExceptionThrowing.doRollbackOnRuntimeException []
+
+Running: ExceptionThrowing.noRollbackOnRuntimeException
+After:   ExceptionThrowing.noRollbackOnRuntimeException [TestData{value='noRollbackOnRuntimeException'}]
+{{</highlight>}}
+
+[.lead]
+Rollback on Exception.class
+
+{{<highlight java>}}
+@Transactional(dontRollbackOn = Exception.class)
+public void noRollbackOnAnyException(Class<? extends Exception> exceptionClass) throws Exception {
+    jdbcTemplate.execute("insert into test_table values('noRollbackOnAnyException')");
+    throw exceptionClass.newInstance();
+}
+
+@Transactional(rollbackOn = Exception.class)
+public void rollbackForAnyException(Class<? extends Exception> exceptionClass) throws Exception {
+    jdbcTemplate.execute("insert into test_table values('rollbackForAnyException')");
+    throw exceptionClass.newInstance();
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: ExceptionThrowing.noRollbackOnAnyException java.lang.Exception
+After:   ExceptionThrowing.noRollbackOnAnyException java.lang.Exception: [TestData{value='noRollbackOnAnyException'}]
+
+Running: ExceptionThrowing.noRollbackOnAnyException java.lang.RuntimeException
+After:   ExceptionThrowing.noRollbackOnAnyException java.lang.RuntimeException: [TestData{value='noRollbackOnAnyException'}]
+
+Running: ExceptionThrowing.rollbackForAnyException java.lang.Exception
+After:   ExceptionThrowing.rollbackForAnyException java.lang.Exception: []
+
+Running: ExceptionThrowing.rollbackForAnyException java.lang.RuntimeException
+After:   ExceptionThrowing.rollbackForAnyException java.lang.RuntimeException: []
+{{</highlight>}}
+
+[.lead]
+[#lombok]#@SnakyThrows and @Transactional#
+
+This is where things are getting interesting.
+To get things straight let’s check Lombok’s documentation on @SneakyThrows
+
+[quote, Project Lombok, https://projectlombok.org/features/SneakyThrows]
+____
+@SneakyThrows can be used to sneakily throw checked exceptions without actually declaring this in your method's throws clause.
+This somewhat contentious ability should be used carefully, of course.
+The code generated by lombok will not ignore, wrap, replace, or otherwise modify the thrown checked exception; it simply fakes out the compiler.
+On the JVM (class file) level, all exceptions, checked or not, can be thrown regardless of the throws clause of your methods, which is why this works.
+____
+
+If you decide to throw checked exception from a method and do nothing about then transaction should not rolled back, right?
+Well, the answer is: "it depends" ;)
+It depends on the type of proxy you are using as exceptions are handled differently in case of CGLib and in a different way when handled by JDK native proxies.
+Let’s start with CGLib proxy as I got a feeling they are more popular and straightforward to use (at least when spring creates them for us).
+
+We simply implement the service method in the following way:
+
+{{<highlight java>}}
+@SneakyThrows
+@Transactional
+public void lombokSurprise() { // <<1>>
+    jdbcTemplate.execute("insert into test_table values('lombok!')");
+    throw new Exception("Simple exception");
+}
+
+@SneakyThrows
+@Transactional(rollbackOn = CustomCheckedException.class)
+public void withRollbackForAndSneakyThrows() { // <<2>>
+    jdbcTemplate.execute("insert into test_table values('withRollbackForAndDeclaredException!')");
+    throw new CustomCheckedException("rollback me");
+}
+
+@SneakyThrows
+@Transactional(dontRollbackOn = CustomCheckedException.class)
+public void withDontRollbackForAndSneakyThrows() { <<3>>
+    jdbcTemplate.execute("insert into test_table values('withRollbackForAndDeclaredException!')");
+    throw new CustomCheckedException("dont rollback me");
+}
+{{</highlight>}}
+
+And here is database state after running it:
+
+{{<highlight text>}}
+Running: ExceptionThrowing.lombokSurprise
+After:   ExceptionThrowing.lombokSurprise: []
+
+Running: ExceptionThrowing.withRollbackForAndSneakyThrows
+After:   ExceptionThrowing.withRollbackForAndSneakyThrows: []
+
+Running: ExceptionThrowing.withDontRollbackForAndSneakyThrows
+After:   ExceptionThrowing.withDontRollbackForAndSneakyThrows: []
+{{</highlight>}}
+
+1.
+Not exactly what you expected right?
+It’s supposed to be checked exception but transaction was rolled back something is not right.
+Not necessarily.
+I don’t know what Lombok is doing to make compiler happy but spring is simply detecting exception that is not supposed to be thrown.
+Spring wraps it in java.lang.reflect.UndeclaredThrowableException (which is a subclass of RuntimeException) and throws it up so it rollbacks the transaction as exception it is subclass of RuntimeException.
+
+2.
+In case we declare rollbackOn it'll get rolled back because RuntimeException will be thrown and they are rolled back by default (rollback on in this case is useless).
+
+3.
+DontRollbackOn simply doesn't work because spring does the checks of exceptions for which to rollback and for which it shouldn't based on method signature (org.springframework.aop.framework.CglibAopProxy.CglibMethodInvocation#proceed).
+
+Ok so we know that @Transaction and Lombok’s @SneakyThrows might not be the best combination.
+It gets more interesting if you add simple JDK Proxy into the mix:
+
+{{<highlight java>}}
+public interface LombokThrowingException {
+    @Transactional
+    void sneakyThrows();
+
+    @Transactional(rollbackOn = CustomCheckedException.class)
+    void withRollbackFor();
+
+    @Transactional(dontRollbackOn = CustomCheckedException.class)
+    void dontRollbackOn();
+}
+
+@Service
+public class LombokThrowingExceptionImpl implements LombokThrowingException {
+    private final JdbcTemplate jdbcTemplate;
+
+    @SneakyThrows
+    @Override
+    public void sneakyThrows() {
+        jdbcTemplate.execute("insert into test_table values('lombok!')");
+        throw new Exception("Simple exception");
+    }
+
+    @SneakyThrows
+    @Override
+    public void withRollbackFor() {
+        jdbcTemplate.execute("insert into test_table values('LombokThrowingExceptionImpl.withRollbackFor')");
+        throw new CustomCheckedException("Rollback?");
+    }
+
+    @SneakyThrows
+    @Override
+    public void dontRollbackOn() {
+        jdbcTemplate.execute("insert into test_table values('dontRollbackOn')");
+        throw new CustomCheckedException("Rollback?");
+    }
+}
+{{</highlight>}}
+
+{{<highlight text>}}
+Running: LombokThrowingExceptionJdkProxy.sneakyThrows
+After:   LombokThrowingExceptionJdkProxy.sneakyThrows: [TestData{value='lombok!'}]
+
+Running: LombokThrowingExceptionJdkProxy.withRollbackFor
+After:   LombokThrowingExceptionJdkProxy.withRollbackFor: []
+
+Running: LombokThrowingExceptionJdkProxy.dontRollbackOn
+After:   LombokThrowingExceptionJdkProxy.dontRollbackOn: [TestData{value='dontRollbackOn'}]
+{{</highlight>}}
+
+That’s interesting behavior with `@SneakyThrows`, isn’t it?
+Seems like JDK proxies are handled in a bit different way and actually work as they supposed to.
+But CGLib based proxies are a bit unpredictable ;)
+
+
+I must admit, I overuse `@SneakyThrows`.
+I always thought that they simply wrap any exception into RuntimeException and that’s how it is working but that’s not true.
+I should’ve read the documentation more carefully because they are not creating a simple proxy for the class they are playing around with how the code is compiled.
+What’s more worrying is that behavior is not consistent which might cause even more confusion and I think it might be a good case against (over)using @SneakyThrows.
+
+As always samples can be found on mu https://github.com/blog-pchudzik-examples/transactional-exceptions[GitHub].
+Feel free to download and play around with them.
