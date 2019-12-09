@@ -161,3 +161,7 @@ h1.header {
 .post-content .lead {
   font-size: 1.2em;
 }
+
+.card-panel ol li {
+  list-style-type: decimal;
+}
