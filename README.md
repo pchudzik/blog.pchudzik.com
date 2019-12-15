@@ -3,36 +3,25 @@ Sources for [my blog](http://blog.pchudzik.com)
 
 It's powered by [hugo](http://gohugo.io)
 
+![](https://github.com/pchudzik/blog.pchudzik.com/workflows/deploy/badge.svg)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/d6f6dbe3-e9de-4dd8-83cc-a7ebe9f7249d/deploy-status)](https://app.netlify.com/sites/blog-pchudzik-com/deploys)
+
 ## Docker
-
-### build docker
-
-```
-docker build -t hugo .
-```
 
 ### serve built files
 
 ```
-docker run -it --rm -v "$(pwd):/site" -p 1313:1313 hugo serve -w
+./server.sh
 ```
 
-### build site for deployment
-
-```
-docker run -it --rm -v "$(pwd):/site" hugo build
-```
+Google analytics will be disabled when serving files locally. To enable it environment variable
+`HUGO_ENV=production` must be defined (passed to docker image building serving site).
 
 ### deploy site
 
-```
-docker run --rm -it -e FTP_USER=put-user-here -e FTP_PASSWORD=put-password-here -v "$(pwd):/site" hugo deploy
-```
-
-### get build site from docker image
-
-Built files will be in dist directory
+Deployment is automatically executed when commit is pushed on master branch. It can be triggered
+manually using:
 
 ```
-mkdir dist && docker run -it --rm -v "$(pwd)/dist:/dist" -v "$(pwd):/site" hugo build
+./deploy.sh
 ```

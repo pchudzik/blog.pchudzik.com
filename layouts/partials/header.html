@@ -7,9 +7,9 @@
 		<link href="{{.Site.BaseURL}}/css/materialize.min.css" type="text/css" rel="stylesheet" media="screen,projection"/>
 		<link href="{{.Site.BaseURL}}/css/style.css" type="text/css" rel="stylesheet" media="screen,projection"/>
 		<link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.0.1/cookieconsent.min.css" />
-		{{ if .RSSLink }}
-		<link href="{{ .RSSLink }}" rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" />
-		<link href="{{ .RSSLink }}" rel="feed" type="application/rss+xml" title="{{ .Site.Title }}" />
+		{{ with .OutputFormats.Get "RSS" }}
+			<link href="{{ .RelPermalink }}" rel="alternate" type="application/rss+xml" title="{{ $.Site.Title }}" />
+			<link href="{{ .RelPermalink }}" rel="feed" type="application/rss+xml" title="{{ $.Site.Title }}" />
 		{{ end }}
 </head>
 <body>
@@ -55,7 +55,9 @@
 					{{if .Site.Params.linkedin}}
 					<a href="https://www.linkedin.com/in/{{.Site.Params.linkedin}}"><img src="{{.Site.BaseURL}}/images/linkedin-dreamstale45.png"></a>
 					{{end}}
-					<a href="{{.Site.BaseURL}}/index.xml"><img src="{{.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
+					{{ with .OutputFormats.Get "RSS" }}
+					<a href="{{ .RelPermalink }}"><img src="{{$.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
+					{{end}}
 				</div>
 			</div>
 		</div>

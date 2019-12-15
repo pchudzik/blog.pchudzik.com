@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-docker run \
-	--rm \
-	-it \
-	-e "HUGO_ENV=development" \
-	-v $(pwd):/site \
+docker run -it --rm \
+	-v $PWD:/src \
+	-v $PWD/site:/site \
+	-e "HUGO_ENV=dev" \
+	--entrypoint hugo-official \
 	-p 1313:1313 \
-	hugo serve
+	klakegg/hugo:0.61.0-asciidoctor \
+	server --buildDrafts --buildFuture --buildExpired --bind 0.0.0.0 --destination /site
