@@ -55,9 +55,7 @@
 					{{if .Site.Params.linkedin}}
 					<a href="https://www.linkedin.com/in/{{.Site.Params.linkedin}}"><img src="{{.Site.BaseURL}}/images/linkedin-dreamstale45.png"></a>
 					{{end}}
-					{{ with .OutputFormats.Get "RSS" }}
-					<a href="{{ .RelPermalink }}"><img src="{{$.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
-					{{end}}
+					<a href="{{.Site.BaseURL}}index.xml"><img src="{{$.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
 				</div>
 			</div>
 		</div>
