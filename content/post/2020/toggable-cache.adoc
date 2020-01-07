@@ -1,0 +1,198 @@
+---
+title: "Toggable Cache"
+Tags: ["java", "spring", "howto"]
+Categories: ["java"]
+date: "2020-01-09"
+---
+
+Sometimes it’s good to have an option to try something out on the live environment.
+Checking things against production like traffic is the most reliable way to gather real-life metrics.
+In this post, I’m going to try and set up spring cache with a toggle.
+It’ll be possible to turn it off and on during application runtime possibly using external toggle service.
+
+<!--more-->
+
+Some time ago we've migrated cache provider from Ehcache to Redis.
+In order to do it, we’ve prepared json serializers for some objects or simply removed caches that we thought were not necessary, in a couple of cases, it turned out they were.
+In other, it turned out that it works faster without caching...
+When we've been in the middle of the process an option to enable/disable cache (or simply fallback to Ehcache) in the runtime might've come handy.
+Unfortunately, I didn't think about it then :(
+This is pretty generic problem so I’ve decided to check how hard it can be to mix up some toggles with spring cache abstraction.
+
+Idea is really simple just write a custom cache manager which will be able to decide if the cache is disabled or not based on toggle value.
+Like this:
+
+{{<highlight java>}}
+class ToggleAwareCacheManager implements CacheManager {
+    private static final Logger log = LoggerFactory.getLogger(ToggleAwareCacheManager.class);
+
+    private final ToggleProvider toggleProvider;
+    private final CacheManager wrapped;
+    private final CacheManager noOpCacheManager;
+
+    ToggleAwareCacheManager(ToggleProvider toggleProvider, CacheManager wrapped) {
+        this.noOpCacheManager = new NoOpCacheManager();
+        this.toggleProvider = toggleProvider;
+        this.wrapped = wrapped;
+    }
+
+    @Override
+    public Cache getCache(String s) {
+        if (toggleProvider.isCacheDisabled(s)) {
+            return noOpCacheManager.getCache(s);
+        }
+
+        return wrapped.getCache(s);
+    }
+
+    @Override
+    public Collection<String> getCacheNames() {
+        return Stream
+                .concat(noOpCacheManager.getCacheNames().stream(), wrapped.getCacheNames().stream())
+                .collect(Collectors.toSet());
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/toggable-cache/blob/master/src/main/java/com/pchudzik/blog/example/toggablecache/infrastructure/ToggleAwareCacheManager.java
+
+Nothing complex here - if cache is disabled return no cache, if it's enabled delegate to redis cache.
+Only thing worth noticing is the way cache names are build from both providers.
+Spring context configuration:
+
+{{<highlight java>}}
+@Configuration
+public class Config {
+    @Value("${cache.redis.host}")
+    private String host;
+
+    @Value("${cache.redis.port}")
+    private int port;
+
+    @Bean
+    public ToggleProvider toggleProvider() {
+        return new ToggleProvider();
+    }
+
+    @Bean("cacheManager")
+    public CacheManager cacheManager() {
+        return new ToggleAwareCacheManager(
+                toggleProvider(),
+                RedisCacheManager.create(lettuceConnectionFactory()));
+    }
+
+    @Bean
+    LettuceConnectionFactory lettuceConnectionFactory() {
+        return new LettuceConnectionFactory(host, port);
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/toggable-cache/blob/master/src/main/java/com/pchudzik/blog/example/toggablecache/infrastructure/Config.java
+
+This is just proof of concept and not production ready solution so the main function which will show if it’s working is enough ;)
+
+{{<highlight java>}}
+public static void main(String[] args) {
+    ConfigurableApplicationContext ctx = SpringApplication.run(ToggableCacheApplication.class, args);
+    ToggleProvider toggle = ctx.getBean(ToggleProvider.class);
+    CachedService service = ctx.getBean(CachedService.class);
+
+    boolean isCacheEnabled = false;
+    toggle.disableCache(Caches.FIRST);
+
+    for (int runs = 0; runs < 5; runs++) {
+        Stream
+                .of(1, 2, 3, 4, 5)
+                .forEach(i -> measure(() -> service.getValue(i)));
+
+        isCacheEnabled = !isCacheEnabled;
+        toggle.toggleCache(Caches.FIRST, isCacheEnabled);
+    }
+}
+
+private static void measure(Runnable action) {
+    long start = System.currentTimeMillis();
+    try {
+        action.run();
+    } finally {
+        long end = System.currentTimeMillis();
+        log.info("Loading value took {}ms", (end - start));
+    }
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/toggable-cache/blob/master/src/main/java/com/pchudzik/blog/example/toggablecache/ToggableCacheApplication.java
+
+And the output:
+
+{{<highlight text "linenos=table">}}
+Started ToggableCacheApplication in 1.878 seconds (JVM running for 2.392)
+Cache cache_1 is DISABLED
+Computing value for 1
+Loading value took 214ms
+Computing value for 2
+Loading value took 203ms
+Computing value for 3
+Loading value took 203ms
+Computing value for 4
+Loading value took 201ms
+Computing value for 5
+Loading value took 204ms
+Cache cache_1 is ENABLED
+Starting without optional epoll library
+Starting without optional kqueue library
+Computing value for 1
+Loading value took 532ms
+Computing value for 2
+Loading value took 208ms
+Computing value for 3
+Loading value took 209ms
+Computing value for 4
+Loading value took 208ms
+Computing value for 5
+Loading value took 207ms
+Cache cache_1 is DISABLED
+Computing value for 1
+Loading value took 203ms
+Computing value for 2
+Loading value took 201ms
+Computing value for 3
+Loading value took 204ms
+Computing value for 4
+Loading value took 203ms
+Computing value for 5
+Loading value took 201ms
+Cache cache_1 is ENABLED
+Loading value took 7ms
+Loading value took 3ms
+Loading value took 2ms
+Loading value took 3ms
+Loading value took 2ms
+Cache cache_1 is DISABLED
+Computing value for 1
+Loading value took 200ms
+Computing value for 2
+Loading value took 205ms
+Computing value for 3
+Loading value took 204ms
+Computing value for 4
+Loading value took 203ms
+Computing value for 5
+Loading value took 201ms
+Cache cache_1 is ENABLED
+{{</highlight>}}
+
+* 2-12 - Cache is disabled is value is calculated on demand.
+* 13-25 - Enabling cache. Each value is calculated as it was previously disabled.
+* 26-36 - Disabling cache. Although values are cached each item is calculated from scratch as cache is disabled.
+* 37-42 - Enabling cache. Values are loaded from previously populated cache.
+* 43-53 - Disabling cache. Again calculating values from scratch.
+
+As you see implementing that wasn’t so complicated.
+All you need to remember is that checking toggles can also be costly especially when toggles are served by separate service.
+In those cases, you should introduce some client-side caching to avoid hitting external service, every time cache is accessed (eg. inside `ToggleProvider`) .
+Full source code can be found on https://github.com/blog-pchudzik-examples/toggable-cache[my github].
