@@ -281,6 +281,150 @@ Closing JPA EntityManagerFactory for persistence unit 'default'
 
 Note highlighted lines which logs queries and database instance that's been used for query execution.
 
+[#nested]
+[.lead]
+Nested transactions
+
+
+[.small]
+Added on 2.2.2020. Dušan Zahoranský thank you for rising this.
+
+When working with nested transactions we should consider following cases:
+
+. outer transaction is readonly and inner transaction is readonly
+. outer transaction is readwrite and inner transaction is readwrite
+. outer transaction is readonly and inner transaction is readwrite
+. outer transaction is readwrite and inner transaction is readonly
+
+Of course nesting can go deeper but rules of usage are the same:
+
+* We don't want to write to replica database as it might cause some issues with synchronization
+* We don't want to read data from replica database just after writing some data to DB as synchronization might've not completed yet.
+
+From available cases first and second are obvious and we should not care about them as we'll be using the same datasource the whole time.
+
+Configurations when we are changing transaction type are interesting.
+To check what we can do about it I've implemented two very simple services with nested transactions:
+
+{{<highlight java>}}
+@Component
+public class TaskServiceInner {
+private final TaskRepository taskRepository;
+
+    public TaskServiceInner(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Task> findAllReadonly() {
+        return taskRepository.findAll();
+    }
+
+    @Transactional
+    public void save(Task task) {
+        taskRepository.saveAndFlush(task);
+    }
+}
+
+@Component
+public class TaskServiceOuter {
+private final TaskServiceInner taskServiceInner;
+
+    public TaskServiceOuter(TaskServiceInner taskServiceInner) {
+        this.taskServiceInner = taskServiceInner;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Task> saveAndFindAllReadonly() {
+        taskServiceInner.save(new Task("a task", "some description"));
+        return taskServiceInner.findAllReadonly();
+    }
+
+    @Transactional
+    public List<Task> saveAndFindAllReadwrite() {
+        taskServiceInner.save(new Task("a task", "some description"));
+        return taskServiceInner.findAllReadonly();
+    }
+}
+{{</highlight>}}
+
+[.small]
+Complete https://github.com/blog-pchudzik-examples/replica-db-for-ro-transactions/blob/master/src/main/java/com/pchudzik/blog/example/readfromreplica/model/TaskServiceInner.java[TaskServiceInner.java] and
+https://github.com/blog-pchudzik-examples/replica-db-for-ro-transactions/blob/master/src/main/java/com/pchudzik/blog/example/readfromreplica/model/TaskServiceOuter.java[TaskServiceOuter.java] are on GitHub.
+
+As names suggest. Outer is used to initialize most outer transaction type and is delegating all the work to inner service which uses different transaction types (readonly and not-readonly).
+
+Going back to transactions configuration we can check what will happen when *outer is readonly and inner is readwrite* by calling `outerService.saveAndFindAllReadonly`.
+With mysql here are logs produced:
+
+{{<highlight text>}}
+Name:replica, Time:2, Success:False, Type:Prepared, Batch:False, QuerySize:1, BatchSize:0, Query:["insert into task (created_at, description, title) values (?, ?, ?)"], Params:[(2020-02-02 18:26:18.553,some description,a task)]
+SQL Error: 0, SQLState: S1009
+ERROR Connection is read-only. Queries leading to data modification are not allowed
+{{</highlight>}}
+
+This is not good (but not as bad as it might've been).
+It tries to do a insert to the replica database, luckily MySQL driver is handling this and throws an error `java.sql.SQLException: Connection is read-only. Queries leading to data modification are not allowed`.
+The problem is it might not work with all databases (it depends on the driver and spring not hibernate doesn't handle it) and might vary from driver to driver depending on it's internal implantation.
+The best option will be to test it with your database or/and add security check to `ReplicaAwareTransactionManager#getTransaction` which might look like this:
+
+{{<highlight java "linenos=table,hl_lines=5-7">}}
+@Override
+public TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException {
+    boolean isTxActive = TransactionSynchronizationManager.isActualTransactionActive();
+
+    if (isTxActive && MasterReplicaRoutingDataSource.isCurrentlyReadonly() && !definition.isReadOnly()) {
+        throw new CannotCreateTransactionException("Can not request RW transaction from initialized readonly transaction");
+    }
+
+    MasterReplicaRoutingDataSource.setReadonlyDataSource(definition.isReadOnly());
+
+    return wrapped.getTransaction(definition);
+}
+{{</highlight>}}
+
+It'll throw an exception in case transaction is active and requested datasource is readonly but transaction is readwrite.
+In case transaction type changes from readonly to readwrite exception will be thrown so you should notice it while testing your application.
+
+
+The next case we should consider is situation when *outer transaction is readwrite and inner transaction is readonly*.
+We can test it by calling `outerService.saveAndFindAllReadwrite`:
+
+{{<highlight text>}}
+Name:master, Time:2, Success:True, Type:Prepared, Batch:False, QuerySize:1, BatchSize:0, Query:["insert into task (created_at, description, title) values (?, ?, ?)"], Params:[(2020-02-02 18:35:51.247,some description,a task)]
+Name:master, Time:5, Success:True, Type:Prepared, Batch:False, QuerySize:1, BatchSize:0, Query:["select task0_.task_id as task_id1_0_, task0_.created_at as created_2_0_, task0_.description as descript3_0_, task0_.title as title4_0_ from task task0_"], Params:[()]
+save & findAll [Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}, Task{title='a task', description='some description'}]
+{{</highlight>}}
+
+Not exactly what I'd expect but it's working quite well.
+Both insert and select calls are executed on master database which is quite surprising to me because when I've been debugging it `getTransaction` have been called multiple times with different transaction configurations.
+After a bit of debugging I've noticed that datasource is acquired only once per transaction and as a result master database is used because the most outer transaction is readwrite.
+As a result master database have been using throughout whole transaction although under the hood transaction level changed couple of times...
+
+I don't like hanging on vendor implementation like this.
+I'd prefer to introduce some security check just to be sure.
+Also I'm not familiar with how connection between spring and hibernate works so I'd introduced additional layer of protection just in case something changes in the future versions of spring or hiberante.
+Adding one simple if statement to `ReplicaAwareTransactionManager#getTransaction` should do the trick:
+
+{{<highlight java "linenos=table,hl_lines=9-11">}}
+@Override
+public TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException {
+    boolean isTxActive = TransactionSynchronizationManager.isActualTransactionActive();
+
+    if (isTxActive && MasterReplicaRoutingDataSource.isCurrentlyReadonly() && !definition.isReadOnly()) {
+        throw new CannotCreateTransactionException("Can not request RW transaction from initialized readonly transaction");
+    }
+
+    if (!isTxActive) {
+        MasterReplicaRoutingDataSource.setReadonlyDataSource(definition.isReadOnly());
+    }
+
+    return wrapped.getTransaction(definition);
+}
+{{</highlight>}}
+
+Implementing above changes should make things safe as once datasource is picked for current transaction it'll not be changed no matter how many different transaction types are used.
+
 [.lead]
 Drawbacks
 
