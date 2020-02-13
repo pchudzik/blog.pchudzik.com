@@ -13,8 +13,8 @@ pygmentsstyle = "manni"
 [params]
   description = "by Paweł Chudzik"
   github = "pchudzik"
-  headerCover = "images/header.jpeg"
-  footerCover = "images/footer.jpeg"
+  headerCover = "images/header.jp2"
+  footerCover = "images/footer.jp2"
   linkedin = "pawel-chudzik"
   googleAnalyticsUserID = "UA-85832534-1"
 
