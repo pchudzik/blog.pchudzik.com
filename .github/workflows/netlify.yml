@@ -17,23 +17,8 @@ jobs:
           mkdir -p site
       - name: Download theme
         run: (cd themes && git clone https://github.com/pdevty/material-design.git)
-      - name: Build
-        run: |
-          docker run \
-          -v ${{ github.workspace }}:/src \
-          -v ${{ github.workspace }}/site:/site \
-          -e "HUGO_ENV=production" \
-          --entrypoint hugo-official \
-          klakegg/hugo:0.61.0-asciidoctor --minify -d /site
-      - name: Fix permissions
-        run: sudo chmod -R 777 ${{ github.workspace }}/site
       - name: Deploy
         env: 
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: |
-          docker run \
-          -e NETLIFY_AUTH_TOKEN="$NETLIFY_AUTH_TOKEN" \
-          -e NETLIFY_SITE_ID="$NETLIFY_SITE_ID" \
-          -v ${{ github.workspace }}/site:/project \
-          williamjackson/netlify-cli:2.25.0 deploy --prod --dir=/project
+        run: ./deploy.sh

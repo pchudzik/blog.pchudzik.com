@@ -6,5 +6,5 @@ docker run -it --rm \
 	-e "HUGO_ENV=dev" \
 	--entrypoint hugo-official \
 	-p 1313:1313 \
-	klakegg/hugo:0.61.0-asciidoctor \
+	klakegg/hugo:0.64.1-asciidoctor \
 	server --buildDrafts --buildFuture --buildExpired --bind 0.0.0.0 --destination /site
