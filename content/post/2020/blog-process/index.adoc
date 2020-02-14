@@ -1,0 +1,199 @@
+---
+title: "How this blog is build"
+Tags: ["docker", "howto", "other"]
+Categories: ["other"]
+date: "2020-02-14"
+---
+
+
+In this post, I’d like to show you how I’ve started with writing this blog.
+How the process evolved during 3 years of writing.
+How I’ve finally managed to set up everything in a way that works for me now.
+If you don’t blog yet this might help you out with technical details on how you can start easily.
+If you already have a blog maybe you’ll be able to pick up some ideas.
+
+<!--more-->
+
+[.lead]
+Engine
+
+[.center-image]
+image::hugo.png[Hugo logo]
+
+I use a static site generator - https://gohugo.io[Hugo] and I’m happy with it.
+There is a lot of ready to use themes available in the https://themes.gohugo.io[themes section] so you should be able to pick something up and just start.
+People build pretty https://gohugo.io/showcase/[impressive sites] with Hugo so you should be good on the functionalities side.
+
+I’ve started writing my posts in plain markdown text.
+Later I’ve switched to asciidoc as it offers more styling options and I like it better.
+You should start with markdown as it’s much simpler and supported out of the box.
+Later if you’ll be lacking features/styling you can check out other document formats that might work better for you.
+
+There is a lot of themes available but nothing is perfect and sooner or later you’ll want to customize something.
+With Hugo, it’s really simple just copy files you want to modify and change whatever you like.
+There is no complicated process around it, no pull requests unless you want to (and you should if it’s something worth sharing).
+It is really simple and allows you to tweak minor details of the theme you’ve selected without much effort.
+
+Right now I have around 140 pages and building it from scratch takes around 20 seconds on the 2015 MacBook.
+Luckily incremental build is much faster and the page is usually already refreshing when I ctrl+tab to it when working on a post.
+A cold start could’ve been faster but I accept it as I don’t have to install any additional dependencies but docker.
+
+I’ve written simple scripts to serve a working copy of it on the localhost.
+{{<highlight bash>}}
+#!/usr/bin/env bash
+
+docker run -it --rm \
+  -v $PWD:/src \
+  -v $PWD/site:/site \
+  -e "HUGO_ENV=dev" \
+  --entrypoint hugo-official \
+  -p 1313:1313 \
+  klakegg/hugo:0.64.1-asciidoctor \
+  server --buildDrafts --buildFuture --buildExpired --bind 0.0.0.0 --destination /site
+{{</highlight>}}
+
+Running the whole thing from docker is really convenient as you don’t have to install anything to write a post.
+Having a whole engine available in docker creates automation possibilities - continuous deployment.
+
+[.lead]
+Writing
+
+[.center-image]
+image::pen.jpeg[]
+
+I start with writing posts in apple’s notes app (previous Evernote and other note-taking services).
+I write the first version in notes because I can access it from a tablet and phone.
+I can easily rework it, attach files, write down ideas, etc.
+I always struggle to sit down and actually write something and having it easily accessible on any device helps.
+
+I used to have the whole folder of unfinished blog posts in the note-taking application.
+I dropped this approach and migrated ideas to Trello where I can easily track things I’d like to write about and things I’ve decided to kill.
+Again having it available everywhere helps.
+If it’s post idea - one minute it’s there and next, I don’t remember what I wanted to fetch from the kitchen.
+It’s important to write ideas as they are very volatile and tend to be forgotten.
+
+When working on a post I first do a plan of what I need to do before I can actually write something.
+I’ve got two modes of writing.
+When I’m familiar with the topic I usually start with the content as this is most troublesome for me and then prepare samples of what I want to show later once I have a narration.
+
+When I’m exploring something I try to start from the project where I play around with the idea and see if it’s worth writing about.
+When I do it the other way around and start from content then I often have to rework big parts of the post.
+I’ve dropped a couple of posts as it turned out something is too trivial or I don’t feel comfortable writing about it.
+
+Once I got post content, code samples, schemas, images ready I copy-paste it to asciidoc file.
+Splitting sentences one per line to make them shorter, rephrase them and remove what doesn’t make sense.
+Then I use https://app.grammarly.com[Grammarly] to check for typos and whatever it’s checking in the free version.
+Finally, after crunching (read it from time to time and let it sit in) on it for some time I publish it.
+
+[.lead]
+Hosting
+
+For a very long time, I’ve been paying for hosting a couple of euros a year.
+Most of the time I’ve been happy with it but then some things stopped working.
+Hosting provider disabled my deployment pipeline by blacklisting some AWS IPs on FTP server - no more deployments from Travis.
+Then they’ve messed some Apache/Nginx configuration to improve performance/disable robots from scanning posts and as result disabled RSS downloading without browser like headers.
+After this, I’ve started looking for alternatives.
+
+For some time I’ve been thinking about using S3 for hosting and I was mentally ready to do the migration when I’ve stumbled upon https://netlify.com/[netlify].
+Netlify allows to host static sites for free (with some transfer limits of course) and offers more possibilities like CDN, building single-page applications, and even some handlers for HTML forms.
+They have an API and CLI tool. It’s free for me as I don’t come close to the bandwidth limits.
+
+
+[.lead]
+Deployment
+
+[.center-image]
+image::pipeline.jpg[Pipeline]
+
+I used to use Travis but now actions are available on GitHub.
+I’ve implemented deployment on GitHub when I’ve switched hosting provider.
+I wanted to check out how it works and I had to redo deployment anyway.
+I’ve configured pipeline which runs after every commit on master.
+It builds this site using Hugo’s official Docker image and publishes produced files to netlify.
+
+The whole thing is just https://github.com/pchudzik/blog.pchudzik.com/blob/1d3b275cc44c9f6ab191af71f0c44e5d98ac3ac1/.github/workflows/netlify.yml[yaml file] that describes the build:
+{{<highlight yaml>}}
+name: deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Make directories
+        run: |
+          mkdir -p themes
+          mkdir -p site
+      - name: Download theme
+        run: (cd themes && git clone https://github.com/pdevty/material-design.git)
+      - name: Deploy
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: ./deploy.sh
+{{</highlight>}}
+
+and https://github.com/pchudzik/blog.pchudzik.com/blob/1d3b275cc44c9f6ab191af71f0c44e5d98ac3ac1/deploy.sh[deploy.sh] file:
+
+{{<highlight bash>}}
+#!/usr/bin/env bash
+
+set -e
+
+if [ -f credentials.sh ]; then
+  . ./credentials.sh
+fi
+
+docker run --rm \
+  -v $PWD:/src \
+  -v $PWD/site:/site \
+  -e "HUGO_ENV=production" \
+  --entrypoint hugo-official \
+  klakegg/hugo:0.64.1-asciidoctor --minify -d /site
+
+sudo chmod -R 777 site
+
+docker run --rm \
+  -e NETLIFY_AUTH_TOKEN="$NETLIFY_AUTH_TOKEN" \
+  -e NETLIFY_SITE_ID="$NETLIFY_SITE_ID" \
+  -v $PWD/site:/project \
+  williamjackson/netlify-cli:2.32.0 deploy --prod --dir=/project
+{{</highlight>}}
+
+I try to avoid fixing build pipeline on predefined actions as those things change.
+I don’t want to do big vendor lock with my process and have the possibility to run the deployment even from my local machine.
+Also, I want to spend as less time as possible on maintaining this part.
+Keeping things simple keeps my options open.
+
+[.lead]
+Testing
+
+[.center-image]
+image::testing.jpg[I don't always test my code, but when I do I do it on production]
+From time to time after upgrading Hugo version or tweaking theme details I notice some bugs appearing (it’s on me as I don’t read release notes too often).
+I‘m thinking about writing simple tests to verify if everything works fine after deployment (a couple of simple checks like is RSS link there and content of it generated properly, etc).
+For now, it’s suspended unless I’ll be checking out a new testing approach of framework.
+Otherwise, it’s not worth the effort because I or someone else will notice it sooner or later ;)
+
+[.lead]
+Summary
+
+This process works for me and all technical details are the easiest and less significant part of the process.
+I’ve been tweaking them for 3 years now to make delivering this blog as painless as possible.
+The only part that still hurts is producing topics I want to write about.
+I started really simple with Hugo, ready to use template, insecure FTP account, and a couple of post ideas.
+With time it evolved and now I’m happy about all but writing process and that’s something I want to improve in the future.
+
+
+[.small]
+image credits:
+
+[.small]
+* https://unsplash.com/photos/9AxFJaNySB8
+* https://unsplash.com/photos/8XddFc6NkBY
