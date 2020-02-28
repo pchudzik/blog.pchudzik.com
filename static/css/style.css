@@ -165,3 +165,7 @@ h1.header {
 .card-panel ol li {
   list-style-type: decimal;
 }
+
+td {
+  padding: 0;
+}

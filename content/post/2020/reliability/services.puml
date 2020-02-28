@@ -1,0 +1,45 @@
+@startuml
+
+package "Rating Service" {
+    component [Reliability\n99.9%] as rating
+}
+
+:user:
+
+node "The system" {
+    package "Cart Service" {
+        component [Reliability\n99.95%] as cart_service
+    }
+
+    database "Cart Database" as cart_service_db {
+        [Reliability\n99.99%] as cartdbr
+    }
+
+    package "Products Service" {
+        component [Reliability\n99.95%] as products
+    }
+
+    database "Products Database" as products_db {
+        [Reliability\n99.99%] as productsdbr
+    }
+
+    package "Prices Service" {
+        component [Reliability\n99.95%] as prices
+    }
+
+    database "Prices Database" as prices_db {
+        [Reliability\n99.99%] as pricesdbr
+    }
+
+    cart_service -up- cart_service_db
+    cart_service -up- products
+    cart_service -up- prices
+
+    products -up- products_db
+    prices -up- prices_db
+}
+
+user -down- cart_service
+cart_service -down- rating
+
+@enduml
