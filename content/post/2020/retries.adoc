@@ -1,0 +1,183 @@
+---
+title: "Synchronous communication - connection settings and retries"
+Tags: ["other"]
+Categories: ["basics", "other"]
+date: "2020-03-17"
+---
+
+The simplest possible strategy that can help with communication issues is retrying to execute the request again.
+Maybe it was just a network glitch and it will work just fine when you try to call it again.
+Introducing retries is a relatively simple step that can improve the stability of your service.
+But before adding retries check if you'll not be waiting for 2 minutes for establishing the connection...
+
+<!--more-->
+
+[.lead]
+Connection settings
+
+So you've added feign to your project and you think doing `Feign.builder().target(Service.class, "http://example.com")` will do the trick?
+I'm afraid you might be surprised here.
+https://github.com/OpenFeign/feign/blob/10.8/core/src/main/java/feign/Request.java#L295[Feign defaults] are to wait 10 seconds to establish a connection and 60 seconds to read the data.
+Are you willing to wait for so long or maybe even a bit longer if you decide to try it https://github.com/OpenFeign/feign/blob/10.8/core/src/main/java/feign/Retryer.java#L40[5 times]?
+
+Going with defaults might be the fastest way to start but might cause you some unexpected issues along the way.
+It doesn't matter what http client you prefer you must always review http settings and be aware what you are accepting as default value.
+
+[.lead]
+Retries
+
+When picking the number of times to retry you should think first about the service you are implementing right now.
+If your response is expected to arrive within 200ms you can retry to 5 times to a service that responds in 100ms.
+People might start retrying you.
+In the worst-case scenario, this might lead to https://blog.pchudzik.com/201912/microservices-are-hard/[cascade failure of the system].
+Going with defaults on your configuration might not be the most reasonable option.
+The number of retries should depend on your service SLAs and the service you are calling response times.
+
+If in case of a failure you should not execute requests one after another.
+Calling continuously might not give enough time for target service to recover.
+Before each retry you should add some delays between calls.
+
+[.lead]
+Retries and http settings with Feign
+
+Connection settings are easy to configure in feign.
+Retries are also pretty straight forward.
+
+{{<highlight java "linenos=table">}}
+@Test
+public void feign_retries_sample() {
+    WireMockScenario
+        .of(get(urlMatching("/hello")), wireMockRule)
+        .willRespondWith(
+            aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER),
+            aResponse().withStatus(503).withBody("service unavailable"),
+            OK_RESPONSE);
+
+    HelloWorld target = Feign.builder()
+            .options(new Request.Options(2, TimeUnit.SECONDS, 2, TimeUnit.SECONDS, true))
+            .retryer(new Retryer.Default(50, 200, 3))
+            .contract(new JAXRSContract())
+            .logger(new Slf4jLogger())
+            .logLevel(Logger.Level.BASIC)
+            .decoder(new GsonDecoder())
+            .encoder(new GsonEncoder())
+            .errorDecoder(new ErrorDecoder.Default() {
+                @Override
+                public Exception decode(String methodKey, Response response) {
+                    if (response.status() == 503) {
+                        return new RetryableException(
+                            response.status(), "Received " + response.status() + " from server",
+                            response.request().httpMethod(), null, response.request());
+                    }
+
+                    return super.decode(methodKey, response);
+                }
+            })
+            .target(HelloWorld.class, "http://localhost:8080");
+
+    String value = target.sayHello().getMessage();
+
+    assertThat(value, equalTo("hello world"));
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/retries/RetriesWithFeignTest.java[Full source]
+
+* Line 3-8 wire mock will respond in order with: connection error, 503 error and finally with valid response.
+* Line 11 configure feign default settings (_override https://github.com/OpenFeign/feign/blob/10.8/core/src/main/java/feign/Request.java#L295[default configuration]_ of 10 seconds for connection and 60 seconds for read timeouts)
+  If you want you can play around with this and comment this line to see if you'll be patient enough for the test to pass...
+* Line 12 configure retry to run 3 times waiting 50 ms between calls and not exceeding 200ms on the request.
+* Line 18-27 extend default error decoder to retry on 503 errors.
+  _Be aware that retry on anything other than IOException is risky and should be considered carefully._
+  It might make things worse not better.
+  _Feign will retry on IOExceptions by default._
+  If you want to retry on anything else you should implement ErrorDecoder and return RetryableException if you want to retry.
+
+In order for all of this to work you'll need following dependencies:
+
+{{<highlight gradle>}}
+compile "io.github.openfeign:feign-core:$feignVersion"
+compile "io.github.openfeign:feign-jaxrs2:$feignVersion"
+compile "io.github.openfeign:feign-gson:$feignVersion"
+compile "io.github.openfeign:feign-slf4j:$feignVersion" // Optional if you want to add logging line 15, 16
+{{</highlight>}}
+
+Feign offers basics capabilities out of the box which are good enough if you don't need anything more sophisticated.
+In case you need more check out https://github.com/OpenFeign/feign#integrations[Feign integrations] maybe what you are looking for is already available.
+In general, I enjoy working with Feign but I don't like that it doesn't force you to think about failures.
+When it fails it fails with RuntimeException which you usually don't bother to catch (especially when they are thrown from external libraries).
+It's easy to lose yourself in writing code and thinking about happy path and what comes next.
+You need to be extra cautious when writing and reviewing code which uses Feign because it's in a human nature to forget.
+
+[.lead]
+Retries with resilience4j and http requests with okhttp and retrofit
+
+To have comparison with Feign let's configure similar scenario with custom http settings and retries with resilience4j, retrofit and okhttp:
+
+{{<highlight java "linenos=table">}}
+@Test
+public void resilience4j_retries_sample() throws Throwable {
+    WireMockScenario
+        .of(get(urlMatching("/hello")), wireMockRule)
+        .willRespondWith(
+            aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER),
+            aResponse().withStatus(503).withBody("Error"),
+            OK_RESPONSE);
+
+    HelloWorld target = new Retrofit.Builder()
+            .client(new OkHttpClient.Builder()
+                    .connectTimeout(2, TimeUnit.SECONDS)
+                    .readTimeout(2, TimeUnit.SECONDS)
+                    .callTimeout(2, TimeUnit.SECONDS)
+                    .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
+                    .build())
+            .baseUrl("http://localhost:8080/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(HelloWorld.class);
+
+    RetryRegistry simpleRetryRegistry = RetryRegistry.of(RetryConfig.<Response<Hello>>custom()
+            .intervalFunction(IntervalFunction.ofExponentialBackoff(50, 1.5))
+            .maxAttempts(3)
+            .retryOnException(ex -> {
+                System.out.println(ex.getMessage());
+                return true;
+            })
+            .retryOnResult(response -> response.code() == 503)
+            .build());
+
+    Optional<String> value = Optional
+            .ofNullable(simpleRetryRegistry
+                    .retry("hello world")
+                    .executeCallable(() -> target.sayHello().execute())
+                    .body())
+            .map(Hello::getMessage);
+
+    assertThat(value.orElse("FAIL"), equalTo("hello world"));
+}
+{{</highlight>}}
+
+[.small]
+https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/retries/RetriesWithResilience4jTest.java[Full source]
+
+* Line 3-8 again wiremock configuration to respond with connection reset, 503 error, and valid response in that order.
+* Line 11-14 setup http connection settings overriding https://github.com/square/okhttp/blob/okhttp_3.14.x/okhttp/src/main/java/okhttp3/OkHttpClient.java#L468[defaults of 10 seconds].
+* Line 23,24 configure a delay for retries and how many times attempt.
+  Check out https://github.com/resilience4j/resilience4j/blob/v1.3.1/resilience4j-core/src/main/java/io/github/resilience4j/core/IntervalFunction.java[IntervalFunction] for other possibilities.
+* Line 25-27 retry on any exception (just to make it simple)
+* Line 29 retry on 503 errors
+  _Be aware that retry on anything other than IOException is risky and should be considered carefully._
+
+I don't have a lot of experience with resilience4j nor retrofit.
+What I like at first glance is that it forces you to think about failures but it comes with a price - you have to use retrofit annotations.
+Resilience4j is not only bound to http calls you can retry anything with it which offers a lot of flexibility and much more than simple retries.
+
+[.lead]
+Summary
+
+If you are facing some kind of a cascading failure or have some weird dependencies between services retrying requests can make things worse.
+Retries are the simples solution but they are like a double-edged sword and you can cut yourself with it.
+Try to think about what will happen in the worst-case scenario and what you should do to make the situation better not worse.
+
+As always full source code for the samples can be found on https://github.com/blog-pchudzik-examples/synchronous-communication[my github].
