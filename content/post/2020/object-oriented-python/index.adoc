@@ -1,0 +1,306 @@
+---
+title: "Object oriented programming in Python"
+Tags: ["basics"]
+Categories: ["python"]
+date: "2020-03-25"
+---
+
+Working with python is fun (as with any language you get hooked up on).
+You can write simple scripts with it, or complex programs and utilities.
+The most surprising thing for people coming from the java world might be that in this "scripting" language _everything_ is an object.
+In this post, I'll explore basic protocols available for user-defined objects.
+
+<!--more-->
+
+[.center-image]
+image::duck.jpg[]
+
+[quote, https://en.wikipedia.org/wiki/Duck_typing]
+"If it walks like a duck and it quacks like a duck, then it must be a duck"
+
+In nutshell with python, it means: I don’t care what you are if you have behavior I'm looking for I will use it.
+This can be very powerful and since I started working more with python it's flexibility only gets me more and more irritated with java compiler ;)
+It is similar to how javascript works but with a bit more constructs built into language itself.
+
+Everything below is meant to be used as a quick reference on how things work as I don’t work with python on daily basis but when I do sometimes I need a quick refresher on what’s what :)
+
+[.lead]
+Object creation, initialization and finalization - +__new__+, +__init__+, +__del__+
+
+:new_link: https://docs.python.org/3/reference/datamodel.html#object.__new__
+:init_link: https://docs.python.org/3/reference/datamodel.html#object.__init__
+:del_link: https://docs.python.org/3/reference/datamodel.html#object.__del__
+
+* +__new__+ - {new_link}
+* +__init__+ - {init_link}
+* +__del__+ - {del_link}
+
++__new__+ is used to create new instances of a class.
+But I don’t see any reason why you might want to use it.
+For most of the possible usages (singletons, extra attributes) there are different language constructs like +__init__+ function, decorators and/or factories.
+
++__init__+, is used to initialize the object after it’s been created.
+Coming from java you might think about it as something between constructor and `@PostConstruct` method.
+It’s the place to initialize your instance, setup variables, etc.
+
++__del__+ is something like java’s finalize method.
+It’s there but you should not play with it ;) (eg. exceptions are printed to `sys.stderr` stream and in general, ignored, and same as with java you don’t really know when the garbage collector will be triggered).
+
+{{<highlight python>}}
+from datetime import datetime
+
+class Person:
+    def __new__(cls, *args, **kwargs):
+        print('__new__ called')
+        instance = super().__new__(cls)
+        setattr(instance, 'created_at', datetime.now())
+        return instance
+
+    def __init__(self, name):
+        print('__init__ called')
+        self.name = name
+
+    def __del__(self):
+        print('__del__ called')
+        raise Exception("It's ignored")
+{{</highlight>}}
+
+{{<highlight python>}}
+p = Person("Adam")
+__new__ called
+__init__ called
+
+p.name, p.created_at
+('Adam', datetime.datetime(2020, 3, 17, 19, 35, 29, 375602))
+{{</highlight>}}
+
+{{<highlight python>}}
+del p
+__del__ called
+Exception ignored in: <function Person.__del__ at 0x10989b9e0>
+Traceback (most recent call last):
+File "<ipython-input-71-f4c91d243632>", line 15, in __del__
+Exception: It's ignored
+{{</highlight>}}
+[.lead]
+Object representation - +__repr__+, +__str__+, +__format__+
+
+:repr_link: https://docs.python.org/3/reference/datamodel.html#object.__repr__
+:str_link: https://docs.python.org/3/reference/datamodel.html#object.__str__
+:format_link: https://docs.python.org/3/reference/datamodel.html#object.__format__
+
+* +__repr__+ - {repr_link}
+* +__str__+ - {str_link}
+* +__format__+ - {format_link}
+
++__repr__+ should be:
+[quote, https://docs.python.org/3/reference/datamodel.html#object.__repr__]
+the “official” string representation of an object. If at all possible, this should look like a valid Python expression that could be used to recreate an object with the same value (given an appropriate environment).
+If this is not possible, a string of the form <...some useful description...> should be returned.
+If there is no +__str__+ method in your class +__repr__+ will be used instead.
+
+The value returned from +__str__+ can be something that you might want present to the user.
+
+{{<highlight python>}}
+class ReprOnly:
+    def __repr__(self):
+        return 'repr'
+
+class StrAndRepr:
+    def __repr__(self):
+        return 'repr'
+
+    def __str__(self):
+        return 'str'
+{{</highlight>}}
+
+{{<highlight python>}}
+repr_only = ReprOnly()
+str_and_repr = StrAndRepr()
+
+print(f"repr_only = '{repr_only}', str_and_repr = '{str_and_repr}'")
+repr_only = 'repr', str_and_repr = 'str'
+
+[repr(repr_only), str(repr_only)], [repr(str_and_repr), str(str_and_repr)]
+(['repr', 'repr'], ['repr', 'str'])
+{{</highlight>}}
+
++__format__+ function can become pretty complicated as there is the https://docs.python.org/3/library/string.html#formatspec[mini-language] describing what’s possible.
+
+If you need to implement this function you should think about delegating most of the work to objects that know how to format themselves so you don’t have to implement it.
+
+{{<highlight python>}}
+class Person:
+    def __init__(self, name, born_year):
+        self.name = name
+        self.born_year = born_year
+
+    def __format__(self, spec):
+        return spec.format(name=self.name, born_year=self.born_year)
+{{</highlight>}}
+
+{{<highlight python>}}
+p = Person("Adam", 1990)
+format(p, "{name} was born in {born_year}")
+'Adam was born in 1990'
+{{</highlight>}}
+
+[.lead]
+Objects comparison - +__lt__+, +__le__+, +__eq__+, +__ne__+, +__gt__+, +__ge__+ & @total_ordering
+
+:lt_link: https://docs.python.org/3/reference/datamodel.html#object.__lt__
+
+Comparison operators - {lt_link}:
+
+* +__lt__+ - o1 < o2
+* +__le__+ - o1 +<=+ o2
+* +__gt__+ - o1 > o2
+* +__ge__+ - o1 +>=+ o2
+* +__eq__+ - o1 == o2 (+hashing)
+* +__ne__+ - o1 != o2
+
+Luckily you do not have to implement them all if your type is totally ordered.
+If yes it’ll be enough to wrap your class in https://docs.python.org/3/library/functools.html#functools.total_ordering[@total_ordering]
+decorator and implement +__eq__+ and one of +__lt__+, +__le__+, +__gt__+, +__ge__+ and from this the decorator will manage to build remaining operators (at a cost of performance).
+
+{{<highlight python>}}
+from math import sqrt
+from functools import total_ordering
+
+@total_ordering
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def distance_to_center(self):
+        return sqrt(self.x**2 + self.y**2)
+
+    def __lt__(self, other):
+        if isinstance(other, Point):
+            return self.distance_to_center() < other.distance_to_center()
+        else:
+            return NotImplemented
+
+    def __eq__(self, other):
+        if isinstance(other, Point):
+            return self.distance_to_center() == other.distance_to_center()
+        else:
+            return NotImplemented
+{{</highlight>}}
+
+{{<highlight python>}}
+p1 = Point(1,1)
+p2 = Point(3,3)
+p1 > p2, p2 >= p1
+(False, True)
+p1 == p2, p1 != p2
+(False, True)
+{{</highlight>}}
+
+You don't have to think about comparison operators only as arithmetical operations.
+Maybe you can use them to expand your Domain Specific Language to increase readability just be aware that it might be confusing for other people so use it wisely.
+
+[.lead]
+Object hashing - +__hash__+
+
+:hash_link: https://docs.python.org/3/reference/datamodel.html#object.__hash__
+
+Last but not least - hashing - {hash_link}.
+
+Most of the stuff in python is based on dictionaries and if you want to reliably put your objects as keys in the hashable collection (dicts or sets) you should implement +__hash__+ and +__eq__+.
+Rules are similar as with java equals and hashCode: => `if o1 == o2: hash(o1) == hash(o2)` and +__hash__+ value should be constant.
+
+{{<highlight python>}}
+class X:
+    pass
+
+x1 = X()
+x2 = X()
+d = {x1: 1, x2: 2}
+d, hex(hash(x1)), hex(hash(x2))
+({<__main__.X at 0x10e5bf2d0>: 1, <__main__.X at 0x10e5bf290>: 2},
+'0x10e5bf2d',
+'0x10e5bf29')
+
+x1 is x1, x1 == x1, x1 is x2, x1 == x2
+(True, True, False, False)
+{{</highlight>}}
+
+{{<highlight python>}}
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        if isinstance(other, Point):
+            return self.x == other.x and self.y == other.y
+        else:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    def __repr__(self):
+        return f"Point({self.x}, {self.y})"
+{{</highlight>}}
+
+{{<highlight python>}}
+p1 = Point(1, 2)
+p2 = Point(2, 1)
+d = {p1: "first", p2: "second"}
+d, hash(p1), hash(p2)
+({Point(1, 2): 'first', Point(2, 1): 'second'},
+3713081631934410656,
+3713082714465905806)
+{{</highlight>}}
+
+If you'll implement +__eq__+ but not +__hash__+ your object will not be hashable (+__hash__+ will be set to `None`).
+You can override this behaviour and fallback to default hash by setting class level property to `+<ParentClass>.__hash__+` (but remember that if `o1 == o2 => hash(o1) == hash(o2)` which might not be true in this case)
+If you want your object not to be hashable you can explicitly set +__hash__+ property to None.
+
+{{<highlight python>}}
+class NotHashable:
+    __hash__ = None
+
+nh = NotHashable()
+hash(nh)
+
+TypeError                                 Traceback (most recent call last)
+<ipython-input-8-b32a50174b94> in <module>
+      1 nh = NotHashable()
+----> 2 hash(nh)
+
+TypeError: unhashable type: 'NotHashable'
+{{</highlight>}}
+
+{{<highlight python>}}
+class HashableWithEqual:
+    __hash__ = object.__hash__
+
+    def __init__(self, name):
+        self.name = name
+
+    def __eq__(self, other):
+        return isnstance(other, HashableWithEqual) and other.name == self.name
+
+hashable = HashableWithEqual("name")
+hash(hashable)
+{{</highlight>}}
+
+[.lead]
+Summary
+
+With this we have some basics covered.
+There is much more to object-oriented programming in python and I’ll focus on it as I have a hard time to remember what method does what and how to implement it and need to google it +_every_single_time_+*
+
+[.small]
++*+ That’s probably you don’t use them as often you might think and most of the time you get pretty well without creating custom classes and applying a more functional approach.
+What I like most so far is how easy it is to mix what I prefer to use (and understand ;)) from both worlds.
+
+[.small]
+Image: https://unsplash.com/photos/fXls-tVemno
+
+[.small]
+https://github.com/blog-pchudzik-examples/oo-python[Samples] written with https://jupyter.org[jupyter notebook].
