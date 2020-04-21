@@ -16,9 +16,11 @@ jobs:
           mkdir -p themes
           mkdir -p site
       - name: Download theme
-        run: (cd themes && git clone https://github.com/pdevty/material-design.git)
+        run: make theme
+      - name: Build blog
+        run: make build
       - name: Deploy
         env: 
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: ./deploy.sh
+        run: make deploy
