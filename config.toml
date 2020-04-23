@@ -6,7 +6,7 @@ title = "tech_gibberish"
 MetaDataFormat = "toml"
 paginate = 9 # To specify a multiple of 3
 disqusShortname = "blog-pchudzik-com"
-copyright = "© 2019 Copyright Paweł Chudzik"
+copyright = "© 2020 Copyright Paweł Chudzik"
 
 pygmentsstyle = "manni"
 
