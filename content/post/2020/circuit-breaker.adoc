@@ -1,0 +1,188 @@
+---
+title: "Synchronous communication - circuit breaker and fallback"
+Tags: ["communication"]
+Categories: ["basics", "communication"]
+date: "2020-05-07"
+---
+
+
+The circuit breaker is a communication pattern that helps to avoid cascading failure of the system and gives dependent services time to recover.
+Along with fallback values defined by the developer, it gives a pretty wide safe net when communication channel is broken.
+
+<!--more-->
+
+The circuit breaker is not an IT invention.
+It’s widely used in electric circuits.
+The idea is pretty simple if everything is OK then the circuit is closed and everything works as supposed to.
+When something (power/voltage/etc) reaches the threshold circuit breaker opens the circuit, therefore, stopping the electric flow.
+(Electric circuit is the simplest connotation to it’s open/close state you can get :))
+
+In software development, circuit breaker works in a very similar way and is usually used as a communication pattern.
+When the threshold is not reached circuit breaker is closed and requests are sent to the destination.
+When the threshold is reached then the circuit breaker opens and no further traffic goes to the destination system.
+In self-healing systems, there is one additional state defined as half-open.
+In this state some probing requests are sent to the destination to check if it’s responsive already and can proceed with normal traffic.
+
+As you can see the idea is not so complicated and once you understand that open is bad state everything else is relatively simple ;).
+If you also bother to configure sane fallback values for certain responses it can hide network glitches or deployments from end-user pretty well.
+The idea itself might be simple, but as the usual devil is in the details.
+Luckily we don’t have to implement it on our own.
+All we have to do is to get familiar with available configuration options in existing libraries.
+In this post, I’ll check how the circuit breaker implementations provided by https://github.com/Netflix/Hystrix[hystrix] and https://github.com/resilience4j/resilience4j[resilience4j] works.
+
+To check how a circuit breaker works in the more real-life but controlled scenario I need some kind of a service that will fail on demand.
+To achieve it I’ve used very simple service that can return fixed response and which behavior I can change on demand - https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/BreakableService.java[BreakableService].
+Once problem with control over dependent service is out of the way we can focus on the circuit breaker itself.
+
+{{<highlight java "linenos=table">}}
+@Test
+public void circuit_breaker_opens_and_closes() {
+    String fallbackValue = "fallback value";
+    HelloWorld helloWorld = HystrixFeign.builder()
+            .options(new Request.Options(2, TimeUnit.SECONDS, 2, TimeUnit.SECONDS, true))
+            .contract(new JAXRSContract())
+            .logger(new Slf4jLogger())
+            .logLevel(Logger.Level.BASIC)
+            .decoder(new GsonDecoder())
+            .setterFactory((target, method) ->
+                    HystrixCommand.Setter
+                            .withGroupKey(HystrixCommandGroupKey.Factory.asKey(target.name()))
+                            .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+                                    .withCircuitBreakerSleepWindowInMilliseconds(10)
+                                    .withCircuitBreakerRequestVolumeThreshold(10))
+            )
+            .target(
+                HelloWorld.class,
+                "http://localhost:" + breakableService.getPort(),
+                () -> new HystrixCommand<Hello>(HystrixCommandGroupKey.Factory.asKey("default")) {
+                    @Override
+                    protected Hello run() throws Exception {
+                        return new Hello(fallbackValue);
+                    }
+                });
+
+    breakableService.useResponseHandler(new FixedResponseHandler(500, "error"));
+    boolean isCircuitBreakerOpen = false;
+    while (!isCircuitBreakerOpen) {
+        HystrixCommand<Hello> cmd = helloWorld.sayHello();
+        isCircuitBreakerOpen = cmd.isCircuitBreakerOpen();
+        cmd.execute();
+    }
+
+    assertThat(helloWorld.sayHello().execute().getMessage(), equalTo(fallbackValue));
+    assertThat(isCircuitBreakerOpen, equalTo(true));
+
+    String workingAgainMessage = "working again";
+    breakableService.useResponseHandler(new FixedResponseHandler(200, workingAgainMessage));
+    while (isCircuitBreakerOpen) {
+        HystrixCommand<Hello> cmd = helloWorld.sayHello();
+        isCircuitBreakerOpen = cmd.isCircuitBreakerOpen();
+        cmd.execute();
+    }
+    assertThat(isCircuitBreakerOpen, equalTo(false));
+    assertThat(helloWorld.sayHello().execute().getMessage(), equalTo(workingAgainMessage));
+}
+{{</highlight>}}
+
+There is quite a lot happening in this sample. Line by line:
+
+* line 10-16 hystrix configuration - https://github.com/Netflix/Hystrix/wiki/Configuration[more options].
+* line 20-25 fallback value configured for hystrix and feign duo.
+* line 27-33 configure service to fail with 500 error and hit it until circuit breaker is closed.
+* line 35-36 verify that returned value is from fallback not actual server response.
+* line 39-44 make service healthy again and wait until circuit breaker closes.
+* line 45-46 verify if everything works as expected with circuit breaker closed.
+
+I've prepared more samples related to error threshold which triggers circuit breaker state:
+
+* https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/FeignCircuitBreakerTest.java#L104[When threshold is set but not reached]
+* https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/FeignCircuitBreakerTest.java#L144[When threshold is set and reached]
+
+When using the feign-hystrix library you should be aware that hystrix is not only a circuit breaker.
+Hystrix offers a lot of functionalities that help to mitigate some risks related to network communication.
+This includes:
+
+* All Hystrix*Commands are executed in separate threads and they are grouped into pools which you
+  define (pool_1 for service A, poll_2 for service B) (it’s also possible to use semaphores)
+* Timeouts for too long-running commands
+* Metrics
+* Circuit breaker
+* Fallback values
+
+As you can see Hystrix offers more than simple circuit breaker implementation and especially with thread pools it might save your tomcat threads from being busy doing nothing but waiting for IO.
+If you don’t need it all, looking for something specific or just want to use something shiny which is still under active development you can try resilience4j which offers more fine-grained control over which patterns you want to use and when.
+
+
+{{<highlight java "linenos=table">}}
+@Test
+public void circuit_breaker_opens_and_closes() throws Exception {
+    int slidingWindowSize = 30;
+    int halfOpenCalls = 10;
+    CircuitBreaker circuitBreaker = CircuitBreaker.of(
+            "testName",
+            CircuitBreakerConfig.custom()
+                    .slidingWindowSize(slidingWindowSize)
+                    .permittedNumberOfCallsInHalfOpenState(halfOpenCalls)
+                    .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                    .waitDurationInOpenState(Duration.of(100, ChronoUnit.MILLIS))
+                    .build());
+    Retrofit retrofit = new Retrofit.Builder()
+            .addCallAdapterFactory(CircuitBreakerCallAdapter.of(circuitBreaker))
+            .addConverterFactory(GsonConverterFactory.create())
+            .baseUrl("http://localhost:" + breakableService.getPort() + "/")
+            .build();
+    HelloWorld helloWorld = retrofit.create(HelloWorld.class);
+
+    breakableService.useResponseHandler(new BreakableService.FixedResponseHandler(500, "error"));
+
+    int failedRequestsCount = executeUntil(
+            () -> helloWorld.sayHello().execute(),
+            () -> circuitBreaker.getState() != CircuitBreaker.State.OPEN);
+
+    assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.getState());
+    assertEquals(slidingWindowSize, failedRequestsCount);
+
+    executeUntil(
+            () -> Thread.sleep(10L),
+            () -> circuitBreaker.getState() == CircuitBreaker.State.OPEN);
+
+    breakableService.useResponseHandler(new BreakableService.FixedResponseHandler(200, "back to normal"));
+    int halfOpenRequestCount = executeUntil(
+            () -> helloWorld.sayHello().execute(),
+            () -> circuitBreaker.getState() != CircuitBreaker.State.CLOSED);
+
+    assertEquals(halfOpenCalls, halfOpenRequestCount);
+}
+{{</highlight>}}
+
+Again going line by line:
+
+* line 5-11 circuit breaker configuration.
+* line 14 applied circuit breaker for retrofit client.
+* line 20-24 configure dependant service to be broken and hit it until circuit breaker opens.
+* line 26-27 verify if circuit breaker opens.
+* line 29-31 wait until circuit breaker opens again (once it opens it rejects all requests for some time).
+* line 33-36 make service healthy again and call it until circuit breaker closes.
+* line 38 verify if circuit closed after defined number of requests.
+
+Couple more examples of using resilience4j with retrofit:
+
+* https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/Resilience4jRetrofitCircuitBreakerTest.java#L52[Circuit breaker doesn't will not accept any request if it's open].
+* https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/Resilience4jRetrofitCircuitBreakerTest.java#L69[Circuit breaker opens after reaching defined threshold]
+* https://github.com/blog-pchudzik-examples/synchronous-communication/blob/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker/Resilience4jRetrofitCircuitBreakerTest.java#L138[Circuit breaker opens after reaching defined threshold]
+
+No matter what you’ll use you should always carefully consider how to configure network communication in your application.
+If you have some service that’s critical for the healthy work of your system then threshold set at a 50% error rate might not necessarily be a good configuration.
+You should also know when it makes sense to use this pattern and when it’ll simply do nothing but introduce an unnecessary abstraction layer.
+For example, it will not help with the communication route that’s called very rarely.
+If the user requests something 20 times a day it will not be a very good candidate to be handled with a circuit breaker (resilience4j with default configuration will not even warm-up).
+
+You should not apply this pattern blindly in all places but you must carefully consider when it makes sense.
+If you are not sure if you need it there is a good chance you are not there yet.
+When you start a new project or functionality and don’t know what to expect you might get away with ensuring there is some kind of an extension point to which you’ll be able to hook up later and add circuit breaker if needed.
+Don’t simply follow Netflix because the scale does matter and something that is must-have for them might be overkill for you.
+
+When I was looking for more information on circuit breaker and other communication patterns I've found https://docs.microsoft.com/en-us/azure/architecture/patterns/[Microsoft Azure documentation] with all of them gathered in single place.
+
+[.small]
+As always all working samples can be found on my https://github.com/blog-pchudzik-examples/synchronous-communication/tree/master/src/test/java/com/pchudzik/blog/examples/asynccommunication/circuitbreaker[GitHub]

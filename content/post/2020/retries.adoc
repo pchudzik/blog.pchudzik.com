@@ -1,7 +1,7 @@
 ---
 title: "Synchronous communication - connection settings and retries"
-Tags: ["other"]
-Categories: ["basics", "other"]
+Tags: ["communication"]
+Categories: ["basics", "communication"]
 date: "2020-03-17"
 ---
 
