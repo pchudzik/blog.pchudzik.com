@@ -1,5 +1,5 @@
-HUGO_VERSION=0.69.0-asciidoctor
-NETLIFY_CLI_VERSION=2.47.0
+HUGO_VERSION=0.83.1-asciidoctor
+NETLIFY_CLI_VERSION=8.6.23
 
 -include credentials.sh
 
