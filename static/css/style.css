@@ -2,170 +2,177 @@
 
 /* break logo text on small device */
 @media (min-width: 500px) {
-  .display-on-small-screen {
-    display: none;
-  }
+    .display-on-small-screen {
+        display: none;
+    }
 }
 
 nav ul a,
 nav .brand-logo {
-  color: #444;
+    color: #444;
 }
 
 p {
-  line-height: 1.5rem;
+    line-height: 1.5rem;
 }
 
 p small {
-  line-height: 1rem;
+    line-height: 1rem;
 }
 
 li p {
-  margin: 0;
+    margin: 0;
 }
 
 .button-collapse {
-  color: #26a69a;
+    color: #26a69a;
 }
 
 .parallax-container {
-  min-height: 380px;
-  line-height: 0;
-  height: auto;
-  color: rgba(255,255,255,.9);
+    min-height: 380px;
+    line-height: 0;
+    height: auto;
+    color: rgba(255, 255, 255, .9);
 }
 
 .parallax-container .section {
     width: 100%;
 }
 
-@media only screen and (max-width : 992px) {
-  .parallax-container .section {
-    position: absolute;
-    top: 40%;
-  }
-  #index-banner .section {
-    top: 10%;
-  }
+@media only screen and (max-width: 992px) {
+    .parallax-container .section {
+        position: absolute;
+        top: 40%;
+    }
+
+    #index-banner .section {
+        top: 10%;
+    }
 }
 
-@media only screen and (max-width : 600px) {
-  #index-banner .section {
-    top: 0;
-  }
+@media only screen and (max-width: 600px) {
+    #index-banner .section {
+        top: 0;
+    }
 }
 
 .icon-block {
-  padding: 0 15px;
+    padding: 0 15px;
 }
 
 footer.page-footer {
-  margin: 0;
-  background-image: url("/images/footer.jp2");
+    margin: 0;
+    background-image: url("/images/footer.jpg");
+    background-position: center center;
+    background-size: 100% auto;
+}
+
+footer .footer-copyright {
+    background-color: transparent !important;
 }
 
 .teal-text.text-lighten-2 {
-  color: white !important;
+    color: white !important;
 }
 
 .teal-text.text-lighten-2 a {
-  color: white !important;
+    color: white !important;
 }
 
 .summary-meta div {
-  display: inline-block;
-  margin-bottom: 10px;
+    display: inline-block;
+    margin-bottom: 10px;
 }
 
 .summary-meta .date {
-  width:40%;
-  text-align: right;
+    width: 40%;
+    text-align: right;
 }
 
 .more-link {
-  width: 50%;
+    width: 50%;
 }
 
 .card-panel li {
-  list-style: disc;
-  margin-left: 20px;
+    list-style: disc;
+    margin-left: 20px;
 }
 
 h1.header {
-  font-size: 4.8rem;
+    font-size: 4.8rem;
 }
 
 .post-content h1.post-title {
-  font-size: 2.2rem;
+    font-size: 2.2rem;
 }
 
 .post-content h1 {
-  font-size: 1.8rem;
-  line-height: 110%;
-  margin: 1.14rem 0 0.912rem 0;
-  font-weight: 400;
+    font-size: 1.8rem;
+    line-height: 110%;
+    margin: 1.14rem 0 0.912rem 0;
+    font-weight: 400;
 }
 
 .post-content h2 {
-  font-size: 1.5rem;
-  line-height: 110%;
-  margin: 1.14rem 0 0.912rem 0;
-  font-weight: 400;
+    font-size: 1.5rem;
+    line-height: 110%;
+    margin: 1.14rem 0 0.912rem 0;
+    font-weight: 400;
 }
 
 .post-content h3 {
-  font-size: 1.3rem;
-  line-height: 110%;
-  margin: 1.14rem 0 0.912rem 0;
-  font-weight: 400;
+    font-size: 1.3rem;
+    line-height: 110%;
+    margin: 1.14rem 0 0.912rem 0;
+    font-weight: 400;
 }
 
 .post-content h4 {
-  font-size: 1.1rem;
-  line-height: 110%;
-  margin: 1.14rem 0 0.912rem 0;
-  font-weight: 400;
+    font-size: 1.1rem;
+    line-height: 110%;
+    margin: 1.14rem 0 0.912rem 0;
+    font-weight: 400;
 }
 
 .post-content h5 {
-  font-size: 1rem;
-  line-height: 110%;
-  margin: 1.14rem 0 0.912rem 0;
-  font-weight: 600;
+    font-size: 1rem;
+    line-height: 110%;
+    margin: 1.14rem 0 0.912rem 0;
+    font-weight: 600;
 }
 
 .post-content small {
-  font-size: 0.8rem;
+    font-size: 0.8rem;
 }
 
 .post-content .small {
-  font-size: 0.8rem;
+    font-size: 0.8rem;
 }
 
 .post-content .small p {
-  margin: 0;
+    margin: 0;
 }
 
 .post-content .small ul {
-  margin: 0;
+    margin: 0;
 }
 
 .post-content img {
-  max-width: 100%;
+    max-width: 100%;
 }
 
 .post-content .center-image {
-  text-align: center;
+    text-align: center;
 }
 
 .post-content .lead {
-  font-size: 1.2em;
+    font-size: 1.2em;
 }
 
 .card-panel ol li {
-  list-style-type: decimal;
+    list-style-type: decimal;
 }
 
 td {
-  padding: 0;
+    padding: 0;
 }
