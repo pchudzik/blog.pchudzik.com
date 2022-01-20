@@ -27,6 +27,10 @@
         <a href="{{.Site.BaseURL}}/tags"><i class="mdi-action-loyalty left"></i>Tags<i
                 class="mdi-hardware-keyboard-arrow-right right"></i></a>
     </li>
+    <li>
+        <a href="https://pchudzik.com"><i class="mdi-action-account-circle left"></i> About<i
+                class="mdi-hardware-keyboard-arrow-right right"></i></a>
+    </li>
 </ul>
 <div id="index-banner" class="parallax-container">
     <a data-activates="slide-out" class="btn-floating button-collapse" style="top: 5px; left: 5px;"><i
@@ -39,7 +43,9 @@
                 </a>
             </h1>
             <div class="row center">
-                <h5 class="header col s12 light">{{.Site.Params.description}}</h5>
+                <h5 class="header col s12 light">
+                    <a href="https://pchudzik.com">{{.Site.Params.description}}</a>
+                </h5>
             </div>
             <div class="row center">
                 {{if .Site.Params.gitlab}}
@@ -64,7 +70,9 @@
                 <a href="https://www.linkedin.com/in/{{.Site.Params.linkedin}}"><img
                         src="{{.Site.BaseURL}}/images/linkedin-dreamstale45.png"></a>
                 {{end}}
-                <a href="{{.Site.BaseURL}}/index.xml"><img src="{{$.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
+                <a href="{{.Site.BaseURL}}index.xml"><img src="{{$.Site.BaseURL}}/images/feed-dreamstale27.png"></a>
+
+                <a href="https://pchudzik.com"><img src="{{.Site.BaseURL}}/images/fav-dreamstale26.png"></a>
             </div>
         </div>
     </div>
