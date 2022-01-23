@@ -1,5 +1,5 @@
 ---
-title: "Gson failute in end-to-end tests"
+title: "Gson failure in end-to-end tests"
 Tags: ["java", "testing", "fail"]
 Categories: ["java"]
 date: "2022-01-23"
