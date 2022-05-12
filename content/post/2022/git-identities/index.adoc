@@ -1,0 +1,117 @@
+---
+title: "Multiple GIT identities"
+Tags: ["howto", "git"]
+Categories: ["howto"]
+date: "2022-05-12"
+---
+
+I have two GitLab accounts - "work account" and "personal account".
+One is for my professional work, it is registered to my work email.
+The second account is for my private/learning projects registered with my private email address.
+I want to keep those things separate and use two different identities when working with git.
+Lately, I've bought a new computer and had to set up this again.
+
+<!--more-->
+
+[.center-image]
+image::keys.jpg[https://unsplash.com/photos/zFy6fOPZEu0]
+
+[.lead]
+Assumptions
+
+* I'll be using SSH protocol for communicating with the git server (SSH is the preferred communication protocol with GitHub, GitLab, and other git services that I know of (BitBucket, Gerrit, etc)).
+* I want to have two (or more) separate accounts and don't want to merge/mix them.
+* I'll use multiple (two in my case) ssh keys because most of the services do not allow to use the same ssh key by two different accounts.
+* I've configured everything for GitLab but the same configuration will work with GitHub.
+
+I'm working on Mac or Linux, which makes SSH usage easy.
+It should be possible to do on Windows.
+I've not used Windows for a very long time, and I'm not sure if Cygwin is still a thing there or if maybe the Linux subsystem is a way to go now.
+If you need to do this on Windows you are on your own, but hopefully, you'll pick up enough keywords to know where to start and what you might need.
+
+[.lead]
+Setup ssh keys
+
+Creating ssh keys is documented in many places.
+You can read how to do it in https://docs.gitlab.com/ee/user/ssh.html[GitLab] or https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent[GitHub] docs.
+When creating keys just remember that you don't want to override them.
+One of them (or both) should have a slightly different name.
+After creating ssh keys I have something like this in my `~/.ssh` folder:
+
+{{<highlight text>}}
+➜  ~ ll ~/.ssh
+total 56
+-rw-r--r-- 1 pawel staff 115B Apr 27 08:44 config
+-rw------- 1 pawel staff 2.6K Apr 21 17:59 id_rsa
+-rw-r--r-- 1 pawel staff 583B Apr 21 17:59 id_rsa.pub
+-rw------- 1 pawel staff 2.6K Apr 23 20:38 id_rsa_acme
+-rw-r--r-- 1 pawel staff 583B Apr 23 20:38 id_rsa_acme.pub
+-rw------- 1 pawel staff 1.5K Apr 25 16:01 known_hosts
+-rw------- 1 pawel staff 748B Apr 22 09:26 known_hosts.old
+{{</highlight>}}
+
+Key with "default" name (`id_rsa` in my case) I'll use for my projects.
+The other one with the `acme` suffix is for my work.
+
+[.lead]
+Setup `~./ssh/config`
+
+We have multiple keys ready, but by default, SSH will use the one named `id_dsa` or `id_rsa`.
+We'll be using the default key, but we also need to configure the work key.
+To do it and not be bothered by it anymore we will define Host entry in the ssh config which will resolve the key to use for the particular host we are connecting to.
+If you have created a default key (for personal projects) and work key (for work projects) we only need to customize work `Hosts`.
+Here is the configuration I have for the work repository:
+
+{{<highlight text>}}
+Host acme-gitlab.com
+    PreferredAuthentications publickey
+    IdentityFile ~/.ssh/id_rsa_acme.pub
+    HostName gitlab.com
+{{</highlight>}}
+
+There are more options available (https://linux.die.net/man/5/ssh_config) but I'll stick to basics.
+At work, we are running GitLab under the gitlab.com domain.
+That's why I've created an alias - acme-gitlab.com which will come in handy later.
+If your private and work git servers are hosted under different domains your configuration will be simpler.
+Something like this will do:
+
+{{<highlight text>}}
+Host gitlab.acme.com
+    PreferredAuthentications publickey
+    IdentityFile ~/.ssh/id_rsa_acme.pub
+{{</highlight>}}
+
+[.lead]
+Clone git repo
+
+For private repositories (repositories to be used with the default key), you don't have to do anything.
+Just clone them and you are good to go.
+For work repositories (customer key) we need to modify the hostname when we clone them.
+Let's say the URL to clone the repo is: +
+`git@gitlab.com:acme/app.git` +
+You have to change it a bit which will match the configuration from the `.ssh/config`: +
+`git@acme-gitlab.com:acme/app.git`. +
+Just modify the URL from which you clone to the repository and configured ssh key will be used to communicate with this git server.
+
+[.lead]
+Bonus - Fetch changes from all repositories in one go
+
+In both work and personal projects I have multiple repositories that I'm working with.
+Using following script I can fetch the latest changes for all of them with just one command:
+
+{{<highlight bash>}}
+#!/usr/bin/env bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+ssh-add --apple-use-keychain
+
+for project in `ls ${DIR}` ; do
+    if [ -d "${DIR}/${project}" ] && [ -d "${DIR}/${project}/.git" ]; then
+        echo "Fetching ${project}"
+        (cd "${DIR}/${project}" && git fetch --all)
+    fi
+done;
+{{</highlight>}}
+
+This script will work on MacOS but will fail on linux. To make it work on Linux something like https://help.ubuntu.com/community/QuickTips#Tip_.233_Keychain_-_Manage_ssh_keys[this] might work.
