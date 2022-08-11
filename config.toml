@@ -1,6 +1,6 @@
 # ( cd themes && git clone git@github.com:pdevty/material-design.git )
 theme = "material-design"
-baseurl = "https://blog.pchudzik.com"
+baseurl = "https://blog.pchudzik.com/"
 languageCode = "en-us"
 title = "tech_gibberish"
 MetaDataFormat = "toml"
@@ -11,12 +11,12 @@ copyright = "© 2022 Copyright Paweł Chudzik"
 pygmentsstyle = "manni"
 
 [params]
-  description = "by Paweł Chudzik"
-  github = "pchudzik"
-  headerCover = "images/header.jp2"
-  footerCover = "images/footer.jp2"
-  linkedin = "pawel-chudzik"
-  googleAnalyticsUserID = "UA-85832534-1"
+description = "by Paweł Chudzik"
+github = "pchudzik"
+headerCover = "images/header.jp2"
+footerCover = "images/footer.jp2"
+linkedin = "pawel-chudzik"
+googleAnalyticsUserID = "UA-85832534-1"
 
 [permalinks]
-  post = "/:year:month/:filename"
+post = "/:year:month/:filename"
