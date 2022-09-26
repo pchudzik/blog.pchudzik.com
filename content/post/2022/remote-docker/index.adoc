@@ -1,0 +1,145 @@
+---
+title: "How to setup remote docker host"
+Tags: ["howto", "docker", "testcontainers"]
+Categories: ["howto"]
+date: "2022-09-26"
+---
+
+Not all docker images are available for ARM architecture (hopefully this will improve over time).
+Right now I'm working on a project where images for ARM are not available.
+Emulation works ok (but slow) most of the time.
+Lately, I stumbled upon an interesting performance/startup issue when running amd64-based containers using testcontainers in an integration test.
+
+<!--more-->
+
+[.lead]
+The issue.
+
+There are no ARM images available for a couple of services I need for integration tests.
+Running them using emulation is slow and flaky.
+Sometimes they simply hang up doing the boot process which causes tests to fail.
+That is annoying especially when you want to run tests and have to run them 5 times to get single proper execution...
+
+[.lead]
+Get yourself linux x86_64 machine
+
+I'm going to use an EC2 instance running in AWS with elastic IP assigned.
+Remember about the following:
+
+* setup elastic IP so you'll not need to reconfigure docker context every time AWS/you decide to restart ec2
+* configure inbound rules to allow access to running containers.
+* export `$HOST` variable with your elastic IP DNS hostname.
+
+I'm not going too deep into the details as they are better resources available on how to do it.
+
+* https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html
+* https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html#using-instance-addressing-eips-allocating
+* https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/authorizing-access-to-an-instance.html
+
+If you have an old laptop/pc lying around you can use it as well for setting up a remote docker host.
+
+[.lead]
+Install and configure docker on a remote host
+
+To install docker follow https://docs.docker.com/engine/install/ubuntu/[official docker instructions].
+
+I'm going to expose the docker daemon to the Internet (running ec2) I configured TLS access to the docker daemon.
+To do this follow yet another https://docs.docker.com/engine/security/protect-access/#use-tls-https-to-protect-the-docker-daemon-socket[official docker instruction].
+
+[.small]
+I'm assuming you've executed all OpenSSL commands in `~/ssl` directory.
+If not align the below commands accordingly.
+
+Once you have certificates created transfer `ca.pem`, `cert.pem` and `key.pem` to your local machine.
+
+{{<highlight text>}}
+scp remote-docker:"ssl/ca.pem ssl/cert.pem ssl/key.pem" .
+{{</highlight>}}
+
+Now let's configure docker to expose daemon access via HTTPS:
+Run the following to create a configuration directory for `dockerd` to use:
+
+{{<highlight text>}}
+mkdir -p /etc/systemd/system/docker.service.d/
+{{</highlight>}}
+
+Next transfer (`mv` or `cp`) `ca.pem`, `server-cert.pem` and `server-key.pem` to `/etc/systemd/system/docker.service.d/`.
+
+{{<highlight text>}}
+mv ca.pem server-cert.pem server-key.pem /etc/systemd/system/docker.service.d/
+{{</highlight>}}
+
+Create docker startup script using your editor of choice:
+
+{{<highlight text>}}
+vim /etc/systemd/system/docker.service.d/options.conf
+{{</highlight>}}
+
+And put the following content into it:
+
+{{<highlight text>}}
+[Service]
+ExecStart=
+ExecStart=dockerd --tlsverify --tlscacert=/etc/systemd/system/docker.service.d/ca.pem --tlscert=/etc/systemd/system/docker.service.d/server-cert.pem --tlskey=/etc/systemd/system/docker.service.d/server-key.pem -H=0.0.0.0:2376 -H unix:///var/run/docker.sock
+{{</highlight>}}
+
+Reload systemd and restart docker:
+
+{{<highlight text>}}
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+{{</highlight>}}
+
+With this we should be good to go.
+
+[.lead]
+Configure local docker client to connect to remote host
+
+https://docs.docker.com/engine/context/working-with-contexts/[Use context].
+
+{{<highlight text>}}
+docker context create aws --docker "host=tcp://ec2address.compute.amazonaws.com:2376,ca=/Users/pawel/.docker/ssl/ca.pem,cert=/Users/pawel/.docker/ssl/cert.pem,key=/Users/pawel/.docker/ssl/key.pem"
+{{</highlight>}}
+
+Execute `docker version` to see if you can connect to the remote docker daemon.
+
+If all went well no one without TLS certificates will be able to access your docker daemon.
+Every container you'll be running from now on using context AWS will be run on a remote docker server.
+
+Things to remember:
+
+* Port forwarding doesn't work.
+If you run something like `docker run -it --rm -p8081:80  nginx` port 8081 will be exposed on the docker server, not your localhost machine.
+If you want to access nginx you'll have to configure an ssh tunnel to it or access it via your remote host IP/DNS address.
+You can probably work around this by writing some smart script that will do ssh port forwarding but that is not necessary for me.
+* Mounting volumes with -v option doesn't work.
+You have to create volume (`docker volume create` and later mount it using `--mount` option).
+
+[.lead]
+Configure testcontainers to use remote docker daemon
+
+Open `~/.testcontainers.properties` and put following content into it (modify `docker-host` to be your docker daemon address):
+
+{{<highlight text>}}
+docker.client.strategy=org.testcontainers.dockerclient.EnvironmentAndSystemPropertyClientProviderStrategy
+docker.host=tcp\://ec2address.compute.amazonaws.com:2376
+docker.tls.verify=1
+docker.cert.path=/Users/pawel/.docker/ssl
+{{</highlight>}}
+
+Run testcontainers test to see if all is working.
+If not, you might need to tweak your application settings to use a combination of `org.testcontainers.containers.ContainerState#getHost` and `org.testcontainers.containers.ContainerState#getMappedPort` if the URL to the service you are running is required and pointing to localhost.
+Also, check if you run https://github.com/testcontainers/testcontainers-java/releases/tag/1.16.0[fairly new version] of testcontainers to have `.testcontainers.properties` support.
+
+[.lead]
+Summary
+
+By all means, this is not a silver bullet.
+As I mentioned at the beginning main issue for me were performance/startup issues related to emulated x86_64 docker images.
+I've solved it by using remote docker daemon when running unit/integration tests and using local docker daemon for everything else.
+It works for me because I'm not so worried about the performance of my local docker daemon as those are images that I usually want to be running in the background while I work on something.
+Startup time is annoying, but I can stomach it when I start it once a day (or just have them always running).
+I hope that with time I'll be able to upgrade the images we use and publish to include arm64 version.
+
+Port forwarding and lack of bind mounts cripple this approach for fully remote development (at least for me).
+Using docker contexts I can use locally running docker daemon for hacking things and remote docker daemon when running tests that use testcontainers and have more aggressive timeouts.
